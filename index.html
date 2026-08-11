@@ -292,26 +292,88 @@
             }
         };
 
-        var Module = {
-            preRun: [function() {
-                FS.mkdir('/saves');
-                FS.mount(IDBFS, {}, '/saves');
-                FS.syncfs(true, function(err) {
-                    if (err) console.log('FS load error:', err);
-                    try {
-                        if (FS.analyzePath('/saves/SaveData.bin').exists) {
-                            var data = FS.readFile('/saves/SaveData.bin');
-                            FS.writeFile('/SaveData.bin', data);
-                            console.log('Save data loaded from IndexedDB');
-                        }
-                    } catch(e) {
-                        console.log('No existing save data found:', e);
-                    }
-                });
-            }],
-            postRun: [function() {
-                finishLoading();
+       preRun: [function() {
 
+    FS.mkdir('/saves');
+    FS.mount(IDBFS, {}, '/saves');
+
+    FS.syncfs(true, function(err) {
+
+        if (err)
+            console.log('FS load error:', err);
+
+        try {
+
+            if (FS.analyzePath('/saves/SaveData.bin').exists) {
+
+                var data = FS.readFile('/saves/SaveData.bin');
+
+                FS.writeFile('/SaveData.bin', data);
+
+                console.log('Save data loaded from IndexedDB');
+
+            }
+
+        } catch(e) {
+
+            console.log(
+                'No existing save data found:',
+                e
+            );
+
+        }
+
+    });
+
+
+    // =========================
+    // MOD LOADER
+    // =========================
+
+    console.log('[ModLoader] Starting...');
+
+    fetch('mods/modlist.json')
+        .then(function(response) {
+
+            if (!response.ok)
+                throw new Error(
+                    'Could not find mods/modlist.json'
+                );
+
+            return response.json();
+
+        })
+
+        .then(function(modList) {
+
+            console.log(
+                '[ModLoader] Found mods:',
+                modList.mods
+            );
+
+            for (var i = 0; i < modList.mods.length; i++) {
+
+                var modName = modList.mods[i];
+
+                console.log(
+                    '[ModLoader] Loading:',
+                    modName
+                );
+
+            }
+
+        })
+
+        .catch(function(error) {
+
+            console.log(
+                '[ModLoader] No mods loaded:',
+                error
+            );
+
+        });
+
+}],
                 setInterval(function() {
                     try {
                         var data = FS.readFile('/SaveData.bin');
