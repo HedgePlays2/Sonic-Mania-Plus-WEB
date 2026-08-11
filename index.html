@@ -292,160 +292,103 @@
             }
         };
 
-     preRun: [function() {
-
-    FS.mkdir('/saves');
-    FS.mount(IDBFS, {}, '/saves');
-
-    FS.syncfs(true, function(err) {
-
-        if (err)
-            console.log('FS load error:', err);
-
-        try {
-
-            if (FS.analyzePath('/saves/SaveData.bin').exists) {
-
-                var data = FS.readFile('/saves/SaveData.bin');
-
-                FS.writeFile('/SaveData.bin', data);
-
-                console.log('Save data loaded from IndexedDB');
-
-            }
-
-        } catch(e) {
-
-            console.log(
-                'No existing save data found:',
-                e
-            );
-
-        }
-
-    });
-
-
-    // =========================
-    // MOD LOADER
-    // =========================
-
-    addRunDependency('modloader');
-
-    console.log('[ModLoader] Starting...');
-
-
-    fetch('mods/modlist.json')
-
-        .then(function(response) {
-
-            if (!response.ok)
-                throw new Error(
-                    'mods/modlist.json not found'
-                );
-
-            return response.json();
-
-        })
-
-        .then(function(modList) {
-
-            if (!modList.mods)
-                return;
-
-            console.log(
-                '[ModLoader] Mods:',
-                modList.mods
-            );
-
-
-            var promises = [];
-
-
-            modList.mods.forEach(function(modName) {
-
-                promises.push(
-
-                    fetch(
-                        'mods/' +
-                        modName +
-                        '/mod.json'
-                    )
-
-                    .then(function(response) {
-
-                        if (!response.ok)
-                            throw new Error(
-                                'mod.json missing'
-                            );
-
-                        return response.json();
-
-                    })
-
-                    .then(function(mod) {
-
-                        if (mod.enabled === false) {
-
-                            console.log(
-                                '[ModLoader] Disabled:',
-                                modName
-                            );
-
-                            return;
-
+        var Module = {
+            preRun: [function() {
+                FS.mkdir('/saves');
+                FS.mount(IDBFS, {}, '/saves');
+                FS.syncfs(true, function(err) {
+                    if (err) console.log('FS load error:', err);
+                    try {
+                        if (FS.analyzePath('/saves/SaveData.bin').exists) {
+                            var data = FS.readFile('/saves/SaveData.bin');
+                            FS.writeFile('/SaveData.bin', data);
+                            console.log('Save data loaded from IndexedDB');
                         }
+                    } catch(e) {
+                        console.log('No existing save data found:', e);
+                    }
+                });
+            }],
+            postRun: [function() {
+                finishLoading();
 
+                setInterval(function() {
+                    try {
+                        var data = FS.readFile('/SaveData.bin');
+                        FS.writeFile('/saves/SaveData.bin', data);
+                    } catch(e) {}
+                    FS.syncfs(false, function(err) {
+                        if (err) console.log('FS save error:', err);
+                    });
+                }, 5000);
+            }],
+            print: function(text) { console.log(text); },
+            printErr: function(text) { console.error(text); },
+            canvas: (function() {
+                var canvas = document.getElementById('canvas');
+                canvas.addEventListener("webglcontextlost", function(e) {
+                    alert('WebGL context lost. Reload the page.');
+                    e.preventDefault();
+                }, false);
+                return canvas;
+            })(),
+            setStatus: function(text) {
+                if (!Module.setStatus.last) Module.setStatus.last = {time: Date.now(), text: ''};
+                if (text === Module.setStatus.last.text) return;
 
-                        console.log(
-                            '[ModLoader] Loaded:',
-                            mod.name || modName
-                        );
+                var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+                var now = Date.now();
+                if (m && now - Module.setStatus.last.time < 30) return;
 
+                Module.setStatus.last.time = now;
+                Module.setStatus.last.text = text;
 
-                        /*
-                         * Mod files will be mounted/
-                         * copied here later.
-                         */
+                if (m) {
+                    var loaded = parseFloat(m[2]);
+                    var total = parseFloat(m[4]);
+                    var percent = Math.round((loaded / total) * 100);
+                    var currentMB = (percent / 100 * totalSizeMB).toFixed(1);
 
-                    })
+                    loadingBar.style.width = percent + '%';
+                    mbText.textContent = currentMB + 'MB of ' + totalSizeMB.toFixed(1) + 'MB';
 
-                    .catch(function(error) {
+                    if (percent < 20) loadingText.textContent = "getting jsdlivr stuff";
+                    else if (percent < 60) loadingText.textContent = "downloading game data...";
+                    else if (percent < 90) loadingText.textContent = "assembling Data.rsdk...";
+                    else loadingText.textContent = "almost there...";
 
-                        console.error(
-                            '[ModLoader] Failed:',
-                            modName,
-                            error
-                        );
+                } else if (text.startsWith('Downloading part')) {
+                    var match = text.match(/(\d+)\/(\d+)/);
+                    if (match) {
+                        var p = Math.round((parseInt(match[1]) / parseInt(match[2])) * 60);
+                        loadingBar.style.width = p + '%';
+                        var currentMB = (p / 100 * totalSizeMB).toFixed(1);
+                        mbText.textContent = currentMB + 'MB of ' + totalSizeMB.toFixed(1) + 'MB';
+                        loadingText.textContent = text;
+                    }
+                } else if (text === 'Assembling Data.data...') {
+                    loadingBar.style.width = '65%';
+                    loadingText.textContent = "combining stuff";
+                }
+            },
+            totalDependencies: 0,
+            monitorRunDependencies: function(left) {
+                this.totalDependencies = Math.max(this.totalDependencies, left);
+                Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : '');
+            }
+        };
 
-                    })
+        Module.setStatus('Downloading...');
 
-                );
-
-            });
-
-
-            return Promise.all(promises);
-
-        })
-
-        .catch(function(error) {
-
-            console.error(
-                '[ModLoader] Error:',
-                error
-            );
-
-        })
-
-        .finally(function() {
-
-            console.log(
-                '[ModLoader] Finished.'
-            );
-
-            removeRunDependency('modloader');
-
+        window.addEventListener('beforeunload', function() {
+            try {
+                var data = FS.readFile('/SaveData.bin');
+                FS.writeFile('/saves/SaveData.bin', data);
+            } catch(e) {}
+            FS.syncfs(false, function(err) {});
         });
-
-}],
+    </script>
+    <script src="https://cdn.jsdelivr.net/gh/UGBONTOP/Sonic-Mania-InYourBrowser@main/Data.js"></script>
+    <script async type="text/javascript" src="https://cdn.jsdelivr.net/gh/UGBONTOP/Sonic-Mania-InYourBrowser@refs/heads/main/RSDKv5U.js"></script>
+</body>
+</html>
