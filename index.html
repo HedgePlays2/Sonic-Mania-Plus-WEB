@@ -34,7 +34,7 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background-color: #000;
+        background: #000;
         font-family: 'Inter', sans-serif;
         text-align: center;
         touch-action: none;
@@ -60,9 +60,10 @@
 
         margin: 0;
         padding: 0;
-        border: 0 none;
+        border: 0;
 
-        background-color: #000;
+        background: #000;
+
         image-rendering: pixelated;
 
         visibility: hidden;
@@ -82,9 +83,7 @@
 
     #loading-screen {
         position: fixed;
-
-        top: 0;
-        left: 0;
+        inset: 0;
 
         width: 100%;
         height: 100%;
@@ -145,49 +144,50 @@
     }
 
     .loading-title {
-        color: #ffffff;
+        color: #fff;
         font-size: 16px;
         font-weight: 900;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        text-shadow: 0 2px 4px rgba(0,0,0,.5);
     }
 
     .loading-mb {
-        color: #ffffff;
+        color: #fff;
         font-size: 14px;
         font-weight: 700;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        text-shadow: 0 2px 4px rgba(0,0,0,.5);
     }
 
     .loading-bar-container {
         width: 100%;
         height: 10px;
 
-        background: rgba(255, 255, 255, 0.2);
+        background: rgba(255,255,255,.2);
 
         border-radius: 10px;
         overflow: hidden;
 
         margin-bottom: 10px;
 
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 2px 10px rgba(0,0,0,.3);
     }
 
     .loading-bar {
         width: 0%;
         height: 100%;
 
-        background: #ffffff;
+        background: #fff;
+
         border-radius: 10px;
 
-        transition: width 0.3s ease-out;
+        transition: width .3s ease-out;
     }
 
     .loading-text {
         font-size: 13px;
-        color: #ffffff;
+        color: #fff;
         font-weight: 700;
 
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        text-shadow: 0 2px 4px rgba(0,0,0,.5);
 
         height: 1.2em;
     }
@@ -204,26 +204,27 @@
         width: 8px;
         height: 8px;
 
-        background: #ffffff;
+        background: #fff;
+
         border-radius: 50%;
 
         animation: dot-pulse 1.5s infinite ease-in-out;
 
-        box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+        box-shadow: 0 0 5px rgba(255,255,255,.5);
     }
 
     .dot:nth-child(2) {
-        animation-delay: 0.2s;
+        animation-delay: .2s;
     }
 
     .dot:nth-child(3) {
-        animation-delay: 0.4s;
+        animation-delay: .4s;
     }
 
     @keyframes dot-pulse {
         0%, 100% {
-            opacity: 0.3;
-            transform: scale(0.8);
+            opacity: .3;
+            transform: scale(.8);
         }
 
         50% {
@@ -240,16 +241,17 @@
 
         text-align: center;
 
-        color: rgba(255, 255, 255, 0.7);
+        color: rgba(255,255,255,.7);
 
         font-size: 11px;
+
         padding: 0 20px;
 
-        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        text-shadow: 0 1px 3px rgba(0,0,0,.5);
     }
 
     /* =========================
-       FULLSCREEN BUTTON
+       FULLSCREEN
        ========================= */
 
     .control-panel {
@@ -262,13 +264,13 @@
     }
 
     .game-btn {
-        background: rgba(0, 0, 0, 0.6);
+        background: rgba(0,0,0,.6);
 
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255,255,255,.2);
 
         border-radius: 6px;
 
-        color: white;
+        color: #fff;
 
         padding: 8px 12px;
 
@@ -283,7 +285,7 @@
 
         backdrop-filter: blur(4px);
 
-        transition: all 0.2s;
+        transition: all .2s;
 
         min-width: 130px;
 
@@ -291,8 +293,8 @@
     }
 
     .game-btn:hover {
-        background: rgba(0, 0, 0, 0.8);
-        border-color: rgba(255, 255, 255, 0.4);
+        background: rgba(0,0,0,.8);
+        border-color: rgba(255,255,255,.4);
     }
 
     /* =========================
@@ -301,13 +303,7 @@
 
     #mobile-controls {
         position: fixed;
-
-        left: 0;
-        right: 0;
-        bottom: 0;
-
-        width: 100%;
-        height: 30vh;
+        inset: 0;
 
         z-index: 2000;
 
@@ -322,39 +318,32 @@
         display: block;
     }
 
-    /* =========================
-       D-PAD
-       ========================= */
-
-    .dpad {
-        position: absolute;
-
-        left: 4vw;
-        bottom: 5vh;
-
-        width: clamp(150px, 30vw, 220px);
-        height: clamp(150px, 30vw, 220px);
-
-        pointer-events: none;
+    body.loading #mobile-controls {
+        display: none;
     }
 
-    .dpad-button {
+    .mobile-button {
         position: absolute;
 
         display: flex;
         align-items: center;
         justify-content: center;
 
-        width: clamp(58px, 10vw, 78px);
-        height: clamp(58px, 10vw, 78px);
+        width: clamp(54px, 11vw, 82px);
+        height: clamp(54px, 11vw, 82px);
 
-        background: rgba(255, 255, 255, 0.18);
+        border-radius: 50%;
 
-        border: 2px solid rgba(255, 255, 255, 0.38);
+        background: rgba(255,255,255,.20);
 
-        color: white;
+        border: 2px solid rgba(255,255,255,.45);
 
-        font-size: clamp(22px, 4vw, 32px);
+        color: #fff;
+
+        font-family: Arial, sans-serif;
+
+        font-size: clamp(18px, 4vw, 30px);
+
         font-weight: 900;
 
         user-select: none;
@@ -366,217 +355,228 @@
         touch-action: none;
 
         backdrop-filter: blur(3px);
+
         -webkit-tap-highlight-color: transparent;
 
+        cursor: pointer;
+
         transition:
-            transform 0.05s,
-            background 0.05s;
+            transform .05s,
+            background .05s;
     }
 
-    .dpad-button.pressed {
-        background: rgba(255, 255, 255, 0.45);
-        transform: scale(0.92);
+    .mobile-button.pressed {
+        background: rgba(255,255,255,.50);
+        transform: scale(.90);
     }
+
+    /* =========================
+       D-PAD
+       ========================= */
 
     #mobile-up {
-        left: 50%;
-        top: 0;
-
-        transform: translateX(-50%);
-
-        border-radius: 18px 18px 8px 8px;
+        left: calc(5vw + clamp(27px, 5.5vw, 41px));
+        bottom: calc(7vh + clamp(54px, 11vw, 82px));
     }
 
     #mobile-left {
-        left: 0;
-        top: 50%;
-
-        transform: translateY(-50%);
-
-        border-radius: 18px 8px 8px 18px;
+        left: 5vw;
+        bottom: 7vh;
     }
 
     #mobile-center {
-        position: absolute;
-
-        left: 50%;
-        top: 50%;
-
-        width: clamp(58px, 10vw, 78px);
-        height: clamp(58px, 10vw, 78px);
-
-        transform: translate(-50%, -50%);
-
-        border-radius: 8px;
-
-        background: rgba(255, 255, 255, 0.12);
-
-        border: 2px solid rgba(255, 255, 255, 0.25);
+        left: calc(5vw + clamp(27px, 5.5vw, 41px));
+        bottom: 7vh;
+        pointer-events: none;
+        opacity: .45;
     }
 
     #mobile-right {
-        right: 0;
-        top: 50%;
-
-        transform: translateY(-50%);
-
-        border-radius: 8px 18px 18px 8px;
+        left: calc(5vw + clamp(54px, 11vw, 82px));
+        bottom: 7vh;
     }
 
     #mobile-down {
-        left: 50%;
-        bottom: 0;
-
-        transform: translateX(-50%);
-
-        border-radius: 8px 8px 18px 18px;
+        left: calc(5vw + clamp(27px, 5.5vw, 41px));
+        bottom: calc(7vh - clamp(54px, 11vw, 82px));
     }
 
     /* =========================
        ACTION BUTTONS
        ========================= */
 
-    .action-buttons {
-        position: absolute;
-
-        right: 4vw;
-        bottom: 5vh;
-
-        width: clamp(210px, 35vw, 300px);
-        height: clamp(150px, 25vw, 210px);
-
-        pointer-events: none;
-    }
-
-    .action-button {
-        position: absolute;
-
-        display: flex;
-
-        align-items: center;
-        justify-content: center;
-
-        background: rgba(255, 255, 255, 0.18);
-
-        border: 2px solid rgba(255, 255, 255, 0.38);
-
-        color: white;
-
-        font-family: Arial, sans-serif;
-
-        font-weight: 900;
-
-        user-select: none;
-        -webkit-user-select: none;
-        -webkit-touch-callout: none;
-
-        pointer-events: auto;
-
-        touch-action: none;
-
-        backdrop-filter: blur(3px);
-
-        -webkit-tap-highlight-color: transparent;
-
-        transition:
-            transform 0.05s,
-            background 0.05s;
-    }
-
-    .action-button.pressed {
-        background: rgba(255, 255, 255, 0.45);
-        transform: scale(0.92);
-    }
-
     #mobile-a {
-        right: 0;
-        top: 0;
-
-        width: clamp(68px, 12vw, 90px);
-        height: clamp(68px, 12vw, 90px);
-
-        border-radius: 50%;
-
-        font-size: clamp(20px, 4vw, 30px);
+        right: 5vw;
+        bottom: 7vh;
     }
 
     #mobile-b {
-        right: clamp(78px, 13vw, 105px);
-        top: 22px;
-
-        width: clamp(62px, 11vw, 82px);
-        height: clamp(62px, 11vw, 82px);
-
-        border-radius: 50%;
-
-        font-size: clamp(18px, 3.5vw, 27px);
+        right: calc(5vw + clamp(54px, 11vw, 82px));
+        bottom: 7vh;
     }
 
     #mobile-q {
-        right: clamp(78px, 13vw, 105px);
-        bottom: 0;
-
-        width: clamp(62px, 11vw, 82px);
-        height: clamp(62px, 11vw, 82px);
-
-        border-radius: 50%;
-
-        font-size: clamp(18px, 3.5vw, 27px);
+        right: calc(5vw + clamp(27px, 5.5vw, 41px));
+        bottom: calc(7vh + clamp(58px, 12vw, 88px));
     }
 
     #mobile-super {
-        right: 0;
-        bottom: 0;
+        right: calc(5vw + clamp(27px, 5.5vw, 41px));
+        bottom: calc(7vh - clamp(58px, 12vw, 88px));
 
-        width: clamp(90px, 16vw, 125px);
-        height: clamp(48px, 8vw, 64px);
+        width: clamp(64px, 13vw, 96px);
+        height: clamp(42px, 8vw, 62px);
 
-        border-radius: 18px;
+        border-radius: 20px;
 
-        font-size: clamp(12px, 2.8vw, 18px);
+        font-size: clamp(13px, 3vw, 20px);
     }
 
     /* =========================
-       DEV BUTTON
+       DEV MENU BUTTON
        ========================= */
 
     #mobile-dev {
-        position: fixed;
+        right: 5vw;
+        top: 7vh;
 
-        top: 12px;
-        left: 12px;
+        width: clamp(50px, 9vw, 70px);
+        height: clamp(42px, 7vw, 56px);
 
-        width: 58px;
-        height: 32px;
+        border-radius: 12px;
 
-        border-radius: 8px;
+        font-size: clamp(12px, 2.5vw, 17px);
 
-        background: rgba(0, 0, 0, 0.55);
-
-        border: 1px solid rgba(255, 255, 255, 0.3);
-
-        color: white;
-
-        font-size: 11px;
-        font-weight: 900;
-
-        pointer-events: auto;
-
-        touch-action: none;
-
-        backdrop-filter: blur(4px);
-
-        -webkit-tap-highlight-color: transparent;
-    }
-
-    #mobile-dev.pressed {
-        background: rgba(255, 255, 255, 0.35);
+        background: rgba(80,80,80,.45);
     }
 
     /* =========================
-       SMALL SCREENS
+       TABLETS / CHROMEBOOKS
        ========================= */
 
+    @media (min-width: 501px) {
+
+        .mobile-button {
+            width: clamp(60px, 8vw, 90px);
+            height: clamp(60px, 8vw, 90px);
+        }
+
+        #mobile-up {
+            left: calc(4vw + clamp(30px, 4vw, 45px));
+            bottom: calc(6vh + clamp(60px, 8vw, 90px));
+        }
+
+        #mobile-left {
+            left: 4vw;
+            bottom: 6vh;
+        }
+
+        #mobile-center {
+            left: calc(4vw + clamp(30px, 4vw, 45px));
+            bottom: 6vh;
+        }
+
+        #mobile-right {
+            left: calc(4vw + clamp(60px, 8vw, 90px));
+            bottom: 6vh;
+        }
+
+        #mobile-down {
+            left: calc(4vw + clamp(30px, 4vw, 45px));
+            bottom: calc(6vh - clamp(60px, 8vw, 90px));
+        }
+
+        #mobile-a {
+            right: 4vw;
+            bottom: 6vh;
+        }
+
+        #mobile-b {
+            right: calc(4vw + clamp(60px, 8vw, 90px));
+            bottom: 6vh;
+        }
+
+        #mobile-q {
+            right: calc(4vw + clamp(30px, 4vw, 45px));
+            bottom: calc(6vh + clamp(64px, 8vw, 94px));
+        }
+
+        #mobile-super {
+            right: calc(4vw + clamp(30px, 4vw, 45px));
+            bottom: calc(6vh - clamp(52px, 6vw, 70px));
+        }
+
+        #mobile-dev {
+            right: 4vw;
+            top: 5vh;
+        }
+    }
+
+    /* =========================
+       LANDSCAPE
+       ========================= */
+
+    @media (orientation: landscape) {
+
+        .mobile-button {
+            width: clamp(48px, 9vh, 76px);
+            height: clamp(48px, 9vh, 76px);
+
+            font-size: clamp(17px, 4vh, 28px);
+        }
+
+        #mobile-up {
+            left: calc(3vw + clamp(24px, 4.5vh, 38px));
+            bottom: calc(5vh + clamp(48px, 9vh, 76px));
+        }
+
+        #mobile-left {
+            left: 3vw;
+            bottom: 5vh;
+        }
+
+        #mobile-center {
+            left: calc(3vw + clamp(24px, 4.5vh, 38px));
+            bottom: 5vh;
+        }
+
+        #mobile-right {
+            left: calc(3vw + clamp(48px, 9vh, 76px));
+            bottom: 5vh;
+        }
+
+        #mobile-down {
+            left: calc(3vw + clamp(24px, 4.5vh, 38px));
+            bottom: calc(5vh - clamp(48px, 9vh, 76px));
+        }
+
+        #mobile-a {
+            right: 3vw;
+            bottom: 5vh;
+        }
+
+        #mobile-b {
+            right: calc(3vw + clamp(48px, 9vh, 76px));
+            bottom: 5vh;
+        }
+
+        #mobile-q {
+            right: calc(3vw + clamp(24px, 4.5vh, 38px));
+            bottom: calc(5vh + clamp(52px, 10vh, 82px));
+        }
+
+        #mobile-super {
+            right: calc(3vw + clamp(24px, 4.5vh, 38px));
+            bottom: calc(5vh - clamp(42px, 7vh, 58px));
+        }
+
+        #mobile-dev {
+            right: 3vw;
+            top: 4vh;
+        }
+    }
+
+    /* Small phones */
     @media (max-width: 500px) {
 
         .control-panel {
@@ -592,94 +592,6 @@
         .game-btn span {
             display: none;
         }
-
-        .dpad {
-            left: 3vw;
-            bottom: 4vh;
-        }
-
-        .action-buttons {
-            right: 3vw;
-            bottom: 4vh;
-        }
-    }
-
-    /* =========================
-       TABLETS / CHROMEBOOKS
-       ========================= */
-
-    @media (min-width: 501px) and (max-width: 1200px) {
-
-        .dpad {
-            left: 4vw;
-            bottom: 5vh;
-        }
-
-        .action-buttons {
-            right: 4vw;
-            bottom: 5vh;
-        }
-    }
-
-    /* =========================
-       LANDSCAPE
-       ========================= */
-
-    @media (orientation: landscape) {
-
-        #mobile-controls {
-            height: 38vh;
-        }
-
-        .dpad {
-            left: 3vw;
-            bottom: 4vh;
-
-            width: clamp(145px, 30vh, 210px);
-            height: clamp(145px, 30vh, 210px);
-        }
-
-        .dpad-button {
-            width: clamp(52px, 10vh, 76px);
-            height: clamp(52px, 10vh, 76px);
-
-            font-size: clamp(20px, 4vh, 30px);
-        }
-
-        #mobile-center {
-            width: clamp(52px, 10vh, 76px);
-            height: clamp(52px, 10vh, 76px);
-        }
-
-        .action-buttons {
-            right: 3vw;
-            bottom: 4vh;
-
-            width: clamp(210px, 40vh, 300px);
-            height: clamp(145px, 30vh, 210px);
-        }
-
-        #mobile-a {
-            width: clamp(62px, 12vh, 88px);
-            height: clamp(62px, 12vh, 88px);
-        }
-
-        #mobile-b,
-        #mobile-q {
-            width: clamp(58px, 11vh, 82px);
-            height: clamp(58px, 11vh, 82px);
-        }
-
-        #mobile-super {
-            width: clamp(88px, 17vh, 125px);
-            height: clamp(44px, 8vh, 64px);
-        }
-    }
-
-    /* Don't show mobile controls while loading */
-
-    body.loading #mobile-controls {
-        display: none;
     }
 </style>
 ```
@@ -708,7 +620,6 @@
      ========================= -->
 
 <div class="control-panel">
-
     <button id="fullscreen-button" class="game-btn">
 
         <svg
@@ -724,99 +635,96 @@
         <span>Fullscreen</span>
 
     </button>
-
 </div>
 
 <!-- =========================
-     MOBILE TOUCH CONTROLS
+     MOBILE CONTROLS
      ========================= -->
 
 <div id="mobile-controls">
 
     <!-- D-PAD -->
 
-    <div class="dpad">
+    <button
+        class="mobile-button"
+        id="mobile-up"
+        data-key="ArrowUp"
+        aria-label="Up">
+        ▲
+    </button>
 
-        <button
-            class="dpad-button"
-            id="mobile-up"
-            data-key="ArrowUp"
-            aria-label="Up">
-            ▲
-        </button>
+    <button
+        class="mobile-button"
+        id="mobile-left"
+        data-key="ArrowLeft"
+        aria-label="Left">
+        ◀
+    </button>
 
-        <button
-            class="dpad-button"
-            id="mobile-left"
-            data-key="ArrowLeft"
-            aria-label="Left">
-            ◀
-        </button>
-
-        <div id="mobile-center"></div>
-
-        <button
-            class="dpad-button"
-            id="mobile-right"
-            data-key="ArrowRight"
-            aria-label="Right">
-            ▶
-        </button>
-
-        <button
-            class="dpad-button"
-            id="mobile-down"
-            data-key="ArrowDown"
-            aria-label="Down">
-            ▼
-        </button>
-
+    <div
+        class="mobile-button"
+        id="mobile-center"
+        aria-hidden="true">
+        ●
     </div>
+
+    <button
+        class="mobile-button"
+        id="mobile-right"
+        data-key="ArrowRight"
+        aria-label="Right">
+        ▶
+    </button>
+
+    <button
+        class="mobile-button"
+        id="mobile-down"
+        data-key="ArrowDown"
+        aria-label="Down">
+        ▼
+    </button>
 
     <!-- ACTION BUTTONS -->
 
-    <div class="action-buttons">
+    <button
+        class="mobile-button"
+        id="mobile-q"
+        data-key="KeyQ"
+        aria-label="Q Jump">
+        Q
+    </button>
 
-        <button
-            class="action-button"
-            id="mobile-a"
-            data-key="KeyA"
-            aria-label="A">
-            A
-        </button>
+    <button
+        class="mobile-button"
+        id="mobile-b"
+        data-key="KeyS"
+        aria-label="B">
+        B
+    </button>
 
-        <button
-            class="action-button"
-            id="mobile-b"
-            data-key="KeyS"
-            aria-label="B">
-            B
-        </button>
+    <button
+        class="mobile-button"
+        id="mobile-a"
+        data-key="KeyA"
+        aria-label="A Jump">
+        A
+    </button>
 
-        <button
-            class="action-button"
-            id="mobile-q"
-            data-key="KeyQ"
-            aria-label="Q">
-            Q
-        </button>
-
-        <button
-            class="action-button"
-            id="mobile-super"
-            data-key="KeyW"
-            aria-label="Super">
-            SUPER
-        </button>
-
-    </div>
+    <button
+        class="mobile-button"
+        id="mobile-super"
+        data-key="KeyW"
+        aria-label="Super">
+        SUPER
+    </button>
 
     <!-- DEV MENU -->
 
     <button
+        class="mobile-button"
         id="mobile-dev"
-        data-key="Escape"
-        aria-label="Dev Menu">
+        data-key="F1"
+        aria-label="Developer Menu">
         DEV
     </button>
 
@@ -869,11 +777,9 @@
     </div>
 
     <div class="loading-dots">
-
         <div class="dot"></div>
         <div class="dot"></div>
         <div class="dot"></div>
-
     </div>
 
     <div class="ownership-footer">
@@ -1093,78 +999,40 @@
 
 
     /* =========================
-       MOBILE KEYBOARD EMULATION
+       TOUCH KEYBOARD EMULATION
        ========================= */
-
-    /*
-     * These are the SAME keyboard keys
-     * used by the working desktop version.
-     *
-     * A      -> jump
-     * S      -> jump
-     * Q      -> jump
-     * W      -> Super
-     * Arrows -> movement
-     * Escape -> Dev Menu
-     */
 
     function sendKeyDown(keyCode) {
 
-        var event = new KeyboardEvent(
-            'keydown',
-            {
-                key:
-                    keyCode === 'KeyA' ? 'a' :
-                    keyCode === 'KeyS' ? 's' :
-                    keyCode === 'KeyQ' ? 'q' :
-                    keyCode === 'KeyW' ? 'w' :
-                    keyCode === 'Escape' ? 'Escape' :
-                    keyCode === 'ArrowUp' ? 'ArrowUp' :
-                    keyCode === 'ArrowDown' ? 'ArrowDown' :
-                    keyCode === 'ArrowLeft' ? 'ArrowLeft' :
-                    keyCode === 'ArrowRight' ? 'ArrowRight' :
-                    keyCode,
+        window.dispatchEvent(
+            new KeyboardEvent(
+                'keydown',
+                {
+                    key: keyCode,
+                    code: keyCode,
 
-                code: keyCode,
-
-                bubbles: true,
-                cancelable: true
-            }
+                    bubbles: true,
+                    cancelable: true
+                }
+            )
         );
-
-        window.dispatchEvent(event);
-        document.dispatchEvent(event);
-
-        canvas.focus();
     }
 
 
     function sendKeyUp(keyCode) {
 
-        var event = new KeyboardEvent(
-            'keyup',
-            {
-                key:
-                    keyCode === 'KeyA' ? 'a' :
-                    keyCode === 'KeyS' ? 's' :
-                    keyCode === 'KeyQ' ? 'q' :
-                    keyCode === 'KeyW' ? 'w' :
-                    keyCode === 'Escape' ? 'Escape' :
-                    keyCode === 'ArrowUp' ? 'ArrowUp' :
-                    keyCode === 'ArrowDown' ? 'ArrowDown' :
-                    keyCode === 'ArrowLeft' ? 'ArrowLeft' :
-                    keyCode === 'ArrowRight' ? 'ArrowRight' :
-                    keyCode,
+        window.dispatchEvent(
+            new KeyboardEvent(
+                'keyup',
+                {
+                    key: keyCode,
+                    code: keyCode,
 
-                code: keyCode,
-
-                bubbles: true,
-                cancelable: true
-            }
+                    bubbles: true,
+                    cancelable: true
+                }
+            )
         );
-
-        window.dispatchEvent(event);
-        document.dispatchEvent(event);
     }
 
 
@@ -1173,8 +1041,11 @@
         var key =
             button.dataset.key;
 
-        var pressedPointers =
-            new Set();
+        if (!key)
+            return;
+
+        var pressed = false;
+        var activePointer = null;
 
 
         function press(event) {
@@ -1182,14 +1053,11 @@
             event.preventDefault();
             event.stopPropagation();
 
-            if (pressedPointers.has(
-                event.pointerId
-            ))
+            if (pressed)
                 return;
 
-            pressedPointers.add(
-                event.pointerId
-            );
+            pressed = true;
+            activePointer = event.pointerId;
 
             button.classList.add(
                 'pressed'
@@ -1212,25 +1080,17 @@
             event.preventDefault();
             event.stopPropagation();
 
-            if (!pressedPointers.has(
-                event.pointerId
-            ))
+            if (!pressed)
                 return;
 
-            pressedPointers.delete(
-                event.pointerId
+            pressed = false;
+            activePointer = null;
+
+            button.classList.remove(
+                'pressed'
             );
 
-            if (
-                pressedPointers.size === 0
-            ) {
-
-                button.classList.remove(
-                    'pressed'
-                );
-
-                sendKeyUp(key);
-            }
+            sendKeyUp(key);
 
             try {
 
@@ -1271,28 +1131,18 @@
 
         button.addEventListener(
             'lostpointercapture',
-            function(event) {
+            function() {
 
-                if (
-                    pressedPointers.has(
-                        event.pointerId
-                    )
-                ) {
+                if (pressed) {
 
-                    pressedPointers.delete(
-                        event.pointerId
+                    pressed = false;
+                    activePointer = null;
+
+                    button.classList.remove(
+                        'pressed'
                     );
 
-                    if (
-                        pressedPointers.size === 0
-                    ) {
-
-                        button.classList.remove(
-                            'pressed'
-                        );
-
-                        sendKeyUp(key);
-                    }
+                    sendKeyUp(key);
                 }
             }
         );
@@ -1311,7 +1161,7 @@
 
     document
         .querySelectorAll(
-            '[data-key]'
+            '#mobile-controls .mobile-button'
         )
         .forEach(
             setupTouchButton
@@ -1322,24 +1172,34 @@
        TOUCH CLEANUP
        ========================= */
 
+    function releaseAllTouchKeys() {
+
+        document
+            .querySelectorAll(
+                '#mobile-controls .mobile-button'
+            )
+            .forEach(
+                function(button) {
+
+                    if (button.dataset.key) {
+
+                        sendKeyUp(
+                            button.dataset.key
+                        );
+                    }
+
+                    button.classList.remove(
+                        'pressed'
+                    );
+
+                }
+            );
+    }
+
+
     window.addEventListener(
         'blur',
-        function() {
-
-            document
-                .querySelectorAll(
-                    '[data-key]'
-                )
-                .forEach(
-                    function(button) {
-
-                        button.classList.remove(
-                            'pressed'
-                        );
-
-                    }
-                );
-        }
+        releaseAllTouchKeys
     );
 
 
@@ -1347,24 +1207,10 @@
         'visibilitychange',
         function() {
 
-            if (
-                document.hidden
-            ) {
-
-                document
-                    .querySelectorAll(
-                        '[data-key]'
-                    )
-                    .forEach(
-                        function(button) {
-
-                            button.classList.remove(
-                                'pressed'
-                            );
-
-                        }
-                    );
+            if (document.hidden) {
+                releaseAllTouchKeys();
             }
+
         }
     );
 
@@ -1499,7 +1345,7 @@
 
 
             canvas.addEventListener(
-                "webglcontextlost",
+                'webglcontextlost',
                 function(e) {
 
                     alert(
