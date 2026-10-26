@@ -16,6 +16,13 @@
 
 <title>Sonic Mania Plus</title>
 
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#0758c9">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sonic Mania Plus">
+
 <link rel="icon"
       href="https://cdn.jsdelivr.net/gh/UGBONTOP/Sonic-Mania-InYourBrowser@main/image_2026-02-26_224423134.png"
       type="image/png">
@@ -1773,5 +1780,15 @@
 </script>
 ```
 
+<script>
+/* PWA shell caching only: the large remote game download stays network-loaded. */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js').catch(function (error) {
+      console.warn('PWA service worker registration failed:', error);
+    });
+  });
+}
+</script>
 </body>
 </html>
