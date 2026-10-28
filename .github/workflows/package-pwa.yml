@@ -1,0 +1,39 @@
+name: Package PWA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "index.html"
+      - "manifest.webmanifest"
+      - "sw.js"
+      - "icons/**"
+      - ".github/workflows/package-pwa.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create PWA ZIP
+        run: |
+          mkdir -p package
+          cp index.html manifest.webmanifest sw.js package/
+          cp -R icons package/icons
+          cp README.md package/README.md
+          cd package
+          zip -r ../Sonic-Mania-Plus-PWA.zip .
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonic-Mania-Plus-PWA
+          path: Sonic-Mania-Plus-PWA.zip
+          if-no-files-found: error
+          retention-days: 30
