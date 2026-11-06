@@ -301,6 +301,10 @@
         border-color: rgba(255, 255, 255, 0.4);
     }
 
+    #touch-controls-toggle {
+        margin-top: 8px;
+    }
+
     /* =========================
        MOBILE CONTROLS
        ========================= */
@@ -326,6 +330,10 @@
 
     body.touch-device #mobile-controls {
         display: block;
+    }
+
+    body.touch-controls-hidden #mobile-controls {
+        display: none !important;
     }
 
     /* =========================
@@ -731,6 +739,10 @@
 
     </button>
 
+    <button id="touch-controls-toggle" class="game-btn" type="button" aria-pressed="true">
+        Touch: ON
+    </button>
+
 </div>
 
 <!-- =========================
@@ -920,6 +932,49 @@
     }
 
     detectTouchDevice();
+
+    /* =========================
+       TOUCH CONTROLS SETTING
+       ========================= */
+
+    var touchControlsToggle =
+        document.getElementById('touch-controls-toggle');
+
+    function setTouchControlsEnabled(enabled) {
+        document.body.classList.toggle('touch-controls-hidden', !enabled);
+
+        touchControlsToggle.textContent =
+            enabled ? 'Touch: ON' : 'Touch: OFF';
+
+        touchControlsToggle.setAttribute(
+            'aria-pressed',
+            enabled ? 'true' : 'false'
+        );
+
+        try {
+            localStorage.setItem(
+                'sonicManiaTouchControls',
+                enabled ? 'on' : 'off'
+            );
+        } catch (e) {
+            console.warn('Could not save touch controls preference:', e);
+        }
+    }
+
+    var touchControlsEnabled = true;
+
+    try {
+        touchControlsEnabled =
+            localStorage.getItem('sonicManiaTouchControls') !== 'off';
+    } catch (e) {}
+
+    setTouchControlsEnabled(touchControlsEnabled);
+
+    touchControlsToggle.addEventListener('click', function() {
+        setTouchControlsEnabled(
+            document.body.classList.contains('touch-controls-hidden')
+        );
+    });
 
 
     /* =========================
