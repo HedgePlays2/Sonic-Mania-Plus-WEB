@@ -1,11 +1,10 @@
 /* Sonic Mania Plus PWA: cache the local app shell, not the large remote game payload. */
-const CACHE_NAME = 'sonic-mania-plus-shell-v2';
+const CACHE_NAME = 'sonic-mania-plus-shell-v3';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './icons/sonic-mania-192.svg',
-  './icons/sonic-mania-512.svg'
+  './icon.png'
 ];
 
 self.addEventListener('install', event => {
