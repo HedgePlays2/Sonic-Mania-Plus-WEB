@@ -1,5 +1,5 @@
 /* Sonic Mania Plus PWA: cache the local app shell, not the large remote game payload. */
-const CACHE_NAME = 'sonic-mania-plus-shell-v3';
+const CACHE_NAME = 'sonic-mania-plus-shell-v4';
 const APP_SHELL = [
   './',
   './index.html',
