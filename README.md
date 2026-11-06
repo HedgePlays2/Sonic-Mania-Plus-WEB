@@ -6,13 +6,9 @@ Sonic Mania Plus web port by Crunch Arcade / Crunchtop;
 
 - GitHub Pages: https://hedgeplays2.github.io/Sonic-Mania-Plus-WEB/
 
-## Install on your device
+## Use
 
-- **Chromebook / ChromeOS:** Open the Pages link in Chrome. Use the install icon in the address bar if it appears, or Chrome menu → **Install page as app**.
-- **Android:** Open the link in Chrome → menu → **Install app** or **Add to Home screen**.
-- **Windows / Linux:** Open in Chrome or Edge → address-bar install icon or browser menu → **Install**.
-- **macOS:** Open in Chrome and use **Install page as app**, or use Safari's web-app option where available.
-- **iPhone / iPad:** Open in Safari → Share → **Add to Home Screen**.
+Open the GitHub Pages link in your browser to play.
 
 ## Credits
 
