@@ -23,9 +23,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Sonic Mania Plus">
 
-<link rel="icon" href="./icon.png?v=2" type="image/png" sizes="512x512">
-<link rel="shortcut icon" href="./icon.png?v=2" type="image/png">
-<link rel="apple-touch-icon" href="./icon.png?v=2" sizes="512x512">
+<link rel="icon" href="./icon.png" type="image/png" sizes="512x512">
 
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
@@ -1836,13 +1834,21 @@
 ```
 
 <script>
-/* PWA shell caching only: the large remote game download stays network-loaded. */
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('./sw.js').catch(function (error) {
-      console.warn('PWA service worker registration failed:', error);
+/* This project uses a normal browser favicon, not an installable PWA. */
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function (registrations) {
+    registrations.forEach(function (registration) {
+      if (registration.scope.startsWith(location.origin + location.pathname.replace(/[^/]*$/, ''))) {
+        registration.unregister();
+      }
     });
-  });
+  }).catch(function () {});
+  if ('caches' in window) {
+    caches.keys().then(function (keys) {
+      keys.filter(function (key) { return key.startsWith('sonic-mania-plus-shell-'); })
+        .forEach(function (key) { caches.delete(key); });
+    }).catch(function () {});
+  }
 }
 </script>
 </body>
