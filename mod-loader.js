@@ -422,9 +422,12 @@
     });
   }
 
+  // Register the Emscripten hooks immediately: the async RSDK script may
+  // finish downloading before DOMContentLoaded on a warm cache.
+  registerEngineHooks();
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { buildUI(); registerEngineHooks(); bindGameEvents(); });
+    document.addEventListener("DOMContentLoaded", function () { buildUI(); bindGameEvents(); });
   } else {
-    buildUI(); registerEngineHooks(); bindGameEvents();
+    buildUI(); bindGameEvents();
   }
 })();
