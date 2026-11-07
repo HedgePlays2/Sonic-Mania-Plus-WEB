@@ -208,18 +208,26 @@
   function runLogicMods() {
     var chain = Promise.resolve();
     installedLogic.forEach(function (mod) {
+      if (mod.type !== "logic") return;
       (mod.scripts || []).forEach(function (scriptPath) {
         var entry = mod.files.find(function (item) { return item.path === scriptPath; });
         if (!entry) return;
         chain = chain.then(function () {
-          var source = new TextDecoder().decode(entry.bytes);
-          var wrapped = '"use strict";\n(function(api){\n' + source + '\n})(window.__createSonicManiaModAPI(' + JSON.stringify(mod.id) + '));';
-          var blobUrl = URL.createObjectURL(new Blob([wrapped], { type: "text/javascript" }));
-          var script = document.createElement("script");
-          script.src = blobUrl;
-          script.onload = function () { URL.revokeObjectURL(blobUrl); };
-          script.onerror = function () { URL.revokeObjectURL(blobUrl); console.error("Could not load logic script for " + mod.name); };
-          document.head.appendChild(script);
+          return new Promise(function (resolve) {
+            var source = new TextDecoder().decode(entry.bytes);
+            var wrapped = '"use strict";\n(function(api){\n' + source + '\n})(window.__createSonicManiaModAPI(' + JSON.stringify(mod.id) + '));';
+            var blobUrl = URL.createObjectURL(new Blob([wrapped], { type: "text/javascript" }));
+            var script = document.createElement("script");
+            script.async = false;
+            script.src = blobUrl;
+            script.onload = function () { URL.revokeObjectURL(blobUrl); resolve(); };
+            script.onerror = function () {
+              URL.revokeObjectURL(blobUrl);
+              console.error("Could not load logic script for " + mod.name);
+              resolve();
+            };
+            document.head.appendChild(script);
+          });
         });
       });
     });
