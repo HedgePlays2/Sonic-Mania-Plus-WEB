@@ -372,12 +372,32 @@
     if (!window.Module) return;
     Module.preRun = Module.preRun || [];
     Module.preRun.push(function () {
-      if (typeof addRunDependency === "function") addRunDependency("sonic-web-mods");
-      loadEnabledModsIntoFS().catch(function (error) {
-        console.error("[Sonic Mania Web Mods] Could not apply mods:", error);
-      }).finally(function () {
-        if (typeof removeRunDependency === "function") removeRunDependency("sonic-web-mods");
-      });
+      var addDependency = Module.addRunDependency || window.addRunDependency;
+      var removeDependency = Module.removeRunDependency || window.removeRunDependency;
+      var dependencyAdded = typeof addDependency === "function" && typeof removeDependency === "function";
+      if (dependencyAdded) addDependency.call(Module, "sonic-web-mods");
+      var startedAt = Date.now();
+      function waitForGameArchive() {
+        var archiveReady = false;
+        try {
+          archiveReady = !!(window.FS && FS.analyzePath("/Data.rsdk").exists);
+        } catch (_) {}
+        if (archiveReady) {
+          loadEnabledModsIntoFS().catch(function (error) {
+            console.error("[Sonic Mania Web Mods] Could not apply mods:", error);
+          }).finally(function () {
+            if (dependencyAdded) removeDependency.call(Module, "sonic-web-mods");
+          });
+          return;
+        }
+        if (Date.now() - startedAt > 90000) {
+          console.warn("[Sonic Mania Web Mods] Data.rsdk was not ready; skipping mod injection.");
+          if (dependencyAdded) removeDependency.call(Module, "sonic-web-mods");
+          return;
+        }
+        setTimeout(waitForGameArchive, 50);
+      }
+      waitForGameArchive();
     });
     Module.postRun = Module.postRun || [];
     Module.postRun.push(function () {
