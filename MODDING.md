@@ -1,37 +1,37 @@
 # Sonic Mania Web Mod Loader
 
-The web port now includes an experimental browser-side mod manager. Open the **Mods** button in the game controls to import ZIPs, enable/disable mods, or remove them.
+Open the **Mods** button in the game controls to import a mod archive, enable/disable mods, or remove them. The importer accepts **ZIP and RAR** archives and looks for the standard Sonic Mania `mod.ini` file.
 
-## ZIP format
+## Standard Sonic Mania mod archives
 
-Each mod is a ZIP containing a `mod.json` at its root. Game asset replacements go inside `assets/`; the folder path after `assets/` is copied into the game's virtual filesystem.
+A typical data mod looks like this:
 
 ```text
-MyMod.zip
-├── mod.json
-├── assets/
-│   └── Data/
-│       └── Sprites/
-│           └── Example.bin
-└── scripts/
-    └── main.js
+ExampleMod.zip (or .rar)
+└── ExampleMod/
+    ├── mod.ini
+    └── Data/
+        └── Sprites/
+            └── ...
 ```
 
-Example `mod.json`:
+The archive may also have `mod.ini` and `Data/` directly at its root. The importer reads these common metadata fields:
 
-```json
-{
-  "id": "my-first-mod",
-  "name": "My First Mod",
-  "version": "1.0.0",
-  "author": "Your Name",
-  "description": "A small example mod.",
-  "type": "asset",
-  "scripts": []
-}
+```ini
+Name=Example Mod
+Description=An example Sonic Mania mod
+Author=Your Name
+Version=1.0
+TargetVersion=5
 ```
 
-For a browser-logic mod, set `"type": "logic"` and list JavaScript files in `scripts`:
+The `Data/` files are staged as loose-file overrides in the game's Emscripten virtual filesystem. Whether a particular replacement appears in-game depends on how this web build of RSDK resolves loose files, so test one mod at a time.
+
+## Legacy web-logic mods
+
+The earlier custom browser-logic format using `mod.json` is still accepted in ZIP archives. It is a web-specific extension format, not the standard Sonic Mania mod format. It can list JavaScript files under `scripts` and use the `SonicManiaModAPI`.
+
+Example:
 
 ```json
 {
@@ -53,24 +53,17 @@ api.on("gameReady", function () {
 });
 
 api.on("keydown", function (input) {
-  if (input.code === "F8") {
-    console.log("F8 pressed");
-  }
+  if (input.code === "F8") console.log("F8 pressed");
 });
 ```
 
-The logic script receives an `api` object with:
-- `api.on(eventName, callback)` — listen for `gameReady`, `keydown`, and `keyup`.
-- `api.emit(eventName, detail)` — send a custom event.
-- `api.getCanvas()` — access the game canvas.
-- `api.getGameModule()` — access the Emscripten Module object.
-- `api.readFile(path)` / `api.writeFile(path, bytes)` — access files in the virtual filesystem.
-
 ## Compatibility status
 
-- **ZIP import and browser storage:** implemented.
-- **Browser JavaScript logic extensions:** implemented as a small web-specific API. These are not the same as native RSDK logic mods.
-- **Asset replacement:** the loader stages files into Emscripten's virtual filesystem after `Data.rsdk` is present. Whether a particular loose-file replacement takes effect depends on how the current upstream RSDK runtime resolves that asset. This needs in-game testing.
-- **Native RSDK mod-loader packages, compiled scripts, and Windows DLL mods:** not yet supported. The current deployed `RSDKv5U.js` / WebAssembly runtime has not been rebuilt with the RSDK mod-loader feature enabled. Full native RSDK mod compatibility requires a mod-loader-enabled WebAssembly engine build.
+- **ZIP import:** supported.
+- **RAR import:** supported through a browser-side WebAssembly archive extractor; encrypted archives and unusual RAR variants may not work.
+- **Standard `mod.ini` metadata:** read by the importer.
+- **Data-only mod files:** staged as loose-file overrides, but still need testing against the current web runtime.
+- **RSDK `LogicFile` mods and Steam `DLLFile` mods:** not executable in this web build. Reading their metadata does not make their compiled code compatible.
+- **Full native RSDK mod loading:** not supported yet. The current upstream `RSDKv5U.js` / WebAssembly runtime has not been rebuilt with the native RSDK mod-loader feature.
 
-Mods are stored locally in this browser using IndexedDB. Imported JavaScript logic mods execute code in the game page, so only install ZIPs from creators you trust.
+Imported mods are stored locally in this browser using IndexedDB. Browser-logic mods execute JavaScript in the game page, so only install mods from creators you trust.
