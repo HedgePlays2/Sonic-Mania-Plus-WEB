@@ -78,9 +78,9 @@
 
   function parseIni(text) {
     var values = Object.create(null);
-    text.replace(/^\\uFEFF/, "").split(/\\r?\\n/).forEach(function (line) {
+    text.replace(/^\uFEFF/, "").split(/\r?\n/).forEach(function (line) {
       var trimmed = line.trim();
-      if (!trimmed || trimmed.charAt(0) === ";" || trimmed.charAt(0) === "#" || /^\\[.*\\]$/.test(trimmed)) return;
+      if (!trimmed || trimmed.charAt(0) === ";" || trimmed.charAt(0) === "#" || /^\[.*\]$/.test(trimmed)) return;
       var equals = trimmed.indexOf("=");
       if (equals < 1) return;
       values[trimmed.slice(0, equals).trim().toLowerCase()] = trimmed.slice(equals + 1).trim();
@@ -102,8 +102,8 @@
   }
 
   function normalizeModEntries(entries, archiveName) {
-    var manifestEntry = entries.find(function (entry) { return /(^|\\/)mod\\.ini$/i.test(entry.path); });
-    var jsonEntry = entries.find(function (entry) { return /(^|\\/)mod\\.json$/i.test(entry.path); });
+    var manifestEntry = entries.find(function (entry) { return /(^|\/)mod\.ini$/i.test(entry.path); });
+    var jsonEntry = entries.find(function (entry) { return /(^|\/)mod\.json$/i.test(entry.path); });
     var marker = manifestEntry || jsonEntry;
     if (!marker) throw new Error("This archive needs a mod.ini file (standard Sonic Mania format).");
 
@@ -116,7 +116,7 @@
       if (!safePath(path)) throw new Error("Unsafe path in archive: " + entry.path);
       // RSDK mods store loose game files in Data/. Map those into the
       // browser loader's asset overlay folder.
-      if (/^Data\\//i.test(path)) path = "assets/" + path;
+      if (/^Data\//i.test(path)) path = "assets/" + path;
       return { path: path, file: entry.file };
     });
 
@@ -128,7 +128,7 @@
       if (manifestEntry) {
         return manifestEntry.file.text().then(function (text) {
           var ini = parseIni(text);
-          var name = ini.name || archiveName.replace(/\\.(zip|rar)$/i, "");
+          var name = ini.name || archiveName.replace(/\.(zip|rar)$/i, "");
           var id = name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "sonic-mania-mod";
           return {
             id: id, name: name, version: ini.version || "1.0", author: ini.author || "Unknown",
