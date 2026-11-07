@@ -76,66 +76,128 @@
     return parts.every(function (part) { return part && part !== "." && part !== ".."; });
   }
 
-  function parseManifest(zip) {
-    var entry = zip.file("mod.json");
-    if (!entry) throw new Error("This ZIP needs a mod.json file at its root.");
-    return entry.async("string").then(function (text) {
-      var manifest;
-      try { manifest = JSON.parse(text); } catch (_) { throw new Error("mod.json is not valid JSON."); }
-      if (!manifest || !safeId(manifest.id) || !manifest.name) {
-        throw new Error("mod.json needs a valid id and a name.");
+  function parseIni(text) {
+    var values = Object.create(null);
+    text.replace(/^\\uFEFF/, "").split(/\\r?\\n/).forEach(function (line) {
+      var trimmed = line.trim();
+      if (!trimmed || trimmed.charAt(0) === ";" || trimmed.charAt(0) === "#" || /^\\[.*\\]$/.test(trimmed)) return;
+      var equals = trimmed.indexOf("=");
+      if (equals < 1) return;
+      values[trimmed.slice(0, equals).trim().toLowerCase()] = trimmed.slice(equals + 1).trim();
+    });
+    return values;
+  }
+
+  function flattenArchiveTree(node, prefix, output) {
+    Object.keys(node || {}).forEach(function (name) {
+      var value = node[name];
+      var path = prefix ? prefix + "/" + name : name;
+      if (value && typeof value.arrayBuffer === "function") {
+        output.push({ path: path, file: value });
+      } else if (value && typeof value === "object") {
+        flattenArchiveTree(value, path, output);
       }
-      manifest.type = manifest.type === "logic" ? "logic" : "asset";
-      manifest.version = String(manifest.version || "1.0");
-      manifest.author = String(manifest.author || "Unknown");
-      manifest.description = String(manifest.description || "");
-      if (manifest.scripts != null && !Array.isArray(manifest.scripts)) {
-        throw new Error("The scripts field must be an array of ZIP paths.");
+    });
+    return output;
+  }
+
+  function normalizeModEntries(entries, archiveName) {
+    var manifestEntry = entries.find(function (entry) { return /(^|\\/)mod\\.ini$/i.test(entry.path); });
+    var jsonEntry = entries.find(function (entry) { return /(^|\\/)mod\\.json$/i.test(entry.path); });
+    var marker = manifestEntry || jsonEntry;
+    if (!marker) throw new Error("This archive needs a mod.ini file (standard Sonic Mania format).");
+
+    var markerParts = marker.path.split("/");
+    var root = markerParts.length > 1 ? markerParts.slice(0, -1).join("/") + "/" : "";
+    var normalized = entries.filter(function (entry) {
+      return entry.path.indexOf(root) === 0 && entry.path !== marker.path;
+    }).map(function (entry) {
+      var path = entry.path.slice(root.length);
+      if (!safePath(path)) throw new Error("Unsafe path in archive: " + entry.path);
+      // RSDK mods store loose game files in Data/. Map those into the
+      // browser loader's asset overlay folder.
+      if (/^Data\\//i.test(path)) path = "assets/" + path;
+      return { path: path, file: entry.file };
+    });
+
+    return Promise.all(normalized.map(function (entry) {
+      return entry.file.arrayBuffer().then(function (buffer) {
+        return { path: entry.path, bytes: new Uint8Array(buffer) };
+      });
+    })).then(function (files) {
+      if (manifestEntry) {
+        return manifestEntry.file.text().then(function (text) {
+          var ini = parseIni(text);
+          var name = ini.name || archiveName.replace(/\\.(zip|rar)$/i, "");
+          var id = name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "sonic-mania-mod";
+          return {
+            id: id, name: name, version: ini.version || "1.0", author: ini.author || "Unknown",
+            description: ini.description || "", type: "asset", scripts: [],
+            targetVersion: ini.targetversion || "", logicFile: ini.logicfile || "", dllFile: ini.dllfile || "",
+            files: files
+          };
+        });
       }
-      return manifest;
+      return jsonEntry.file.text().then(function (text) {
+        var manifest;
+        try { manifest = JSON.parse(text); } catch (_) { throw new Error("mod.json is not valid JSON."); }
+        if (!manifest || !safeId(manifest.id) || !manifest.name) throw new Error("mod.json needs a valid id and a name.");
+        manifest.scripts = manifest.scripts || [];
+        if (!Array.isArray(manifest.scripts)) throw new Error("The scripts field must be an array of archive paths.");
+        manifest.scripts.forEach(function (path) {
+          if (!safePath(path) || !files.some(function (entry) { return entry.path === path; })) throw new Error("Missing or unsafe logic script: " + path);
+        });
+        return {
+          id: manifest.id, name: String(manifest.name), version: String(manifest.version || "1.0"),
+          author: String(manifest.author || "Unknown"), description: String(manifest.description || ""),
+          type: manifest.type === "logic" ? "logic" : "asset", scripts: manifest.scripts,
+          files: files
+        };
+      });
     });
   }
 
-  function installZip(file) {
-    if (!window.JSZip) return Promise.reject(new Error("ZIP support did not load. Refresh and try again."));
-    if (!file || file.size > MAX_ZIP_BYTES) return Promise.reject(new Error("ZIP files must be 100 MB or smaller."));
-    return file.arrayBuffer().then(function (buffer) {
-      return JSZip.loadAsync(buffer, { checkCRC32: true }).then(function (zip) {
-        return parseManifest(zip).then(function (manifest) {
-          var files = Object.keys(zip.files).filter(function (name) {
-            return !zip.files[name].dir && name !== "mod.json";
-          });
-          var unpacked = files.reduce(function (total, name) {
-            return total + (zip.files[name]._data && zip.files[name]._data.uncompressedSize || 0);
-          }, 0);
-          if (unpacked > MAX_UNPACKED_BYTES) throw new Error("This mod expands beyond the 256 MB safety limit.");
-          var bad = files.find(function (name) { return !safePath(name); });
-          if (bad) throw new Error("Unsafe path in ZIP: " + bad);
-          var scripts = manifest.scripts || [];
-          scripts.forEach(function (path) {
-            if (!safePath(path) || !zip.file(path)) throw new Error("Missing or unsafe logic script: " + path);
-          });
-          var payloads = files.map(function (path) {
-            return zip.file(path).async("uint8array").then(function (bytes) {
-              return { path: path, bytes: bytes };
-            });
-          });
-          return Promise.all(payloads).then(function (entries) {
-            return saveMod({
-              id: manifest.id,
-              name: String(manifest.name),
-              version: manifest.version,
-              author: manifest.author,
-              description: manifest.description,
-              type: manifest.type,
-              scripts: scripts,
-              enabled: false,
-              installedAt: Date.now(),
-              files: entries
-            });
-          });
+  function installArchive(file) {
+    if (!file || file.size > MAX_ZIP_BYTES) return Promise.reject(new Error("Archive files must be 100 MB or smaller."));
+    var extension = (file.name.split(".").pop() || "").toLowerCase();
+    var entriesPromise;
+    if (extension === "zip") {
+      if (!window.JSZip) return Promise.reject(new Error("ZIP support did not load. Refresh and try again."));
+      entriesPromise = file.arrayBuffer().then(function (buffer) {
+        return JSZip.loadAsync(buffer, { checkCRC32: true }).then(function (zip) {
+          return Promise.all(Object.keys(zip.files).filter(function (path) {
+            return !zip.files[path].dir;
+          }).map(function (path) {
+            return zip.files[path].async("blob").then(function (blob) { return { path: path, file: blob }; });
+          }));
         });
       });
+    } else if (extension === "rar") {
+      entriesPromise = import("https://esm.sh/libarchive.js@2.0.2").then(function (library) {
+        var Archive = library.Archive || (library.default && library.default.Archive);
+        if (!Archive) throw new Error("RAR extraction library did not initialize.");
+        Archive.init({ workerUrl: "https://cdn.jsdelivr.net/npm/libarchive.js@2.0.2/dist/worker-bundle.js" });
+        return Archive.open(file).then(function (archive) {
+          return archive.extractFiles().then(function (tree) { return flattenArchiveTree(tree, "", []); });
+        });
+      }).catch(function (error) {
+        console.error("[Sonic Mania Web Mods] RAR extraction failed:", error);
+        throw new Error("Could not open this RAR. It may be encrypted, damaged, or unsupported.");
+      });
+    } else {
+      return Promise.reject(new Error("Choose a .zip or .rar mod archive."));
+    }
+
+    return entriesPromise.then(function (entries) {
+      var total = entries.reduce(function (sum, entry) { return sum + (entry.file.size || 0); }, 0);
+      if (total > MAX_UNPACKED_BYTES) throw new Error("This mod expands beyond the 256 MB safety limit.");
+      var unsafe = entries.find(function (entry) { return !safePath(entry.path); });
+      if (unsafe) throw new Error("Unsafe path in archive: " + unsafe.path);
+      return normalizeModEntries(entries, file.name);
+    }).then(function (mod) {
+      mod.enabled = false;
+      mod.installedAt = Date.now();
+      return saveMod(mod);
     });
   }
 
@@ -254,7 +316,7 @@
     if (!container) return;
     container.textContent = "";
     if (!list.length) {
-      container.appendChild(el("p", "sm-empty", "No mods installed yet. Import a .zip to get started."));
+      container.appendChild(el("p", "sm-empty", "No mods installed yet. Import a .zip or .rar to get started."));
       return;
     }
     list.sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (mod) {
@@ -334,12 +396,12 @@
     header.appendChild(heading);
     header.appendChild(close);
     windowBox.appendChild(header);
-    windowBox.appendChild(el("p", "sm-mod-sub", "Install ZIP mods, switch them on or off, and keep your collection saved in this browser. Changes apply after restarting the game."));
+    windowBox.appendChild(el("p", "sm-mod-sub", "Install Sonic Mania mod archives (.zip or .rar), switch them on or off, and keep your collection saved in this browser. Changes apply after restarting the game."));
     var toolbar = el("div", "sm-mod-toolbar");
-    var importLabel = el("label", "", "＋ Import .ZIP");
+    var importLabel = el("label", "", "＋ Import .ZIP / .RAR");
     var input = document.createElement("input");
     input.type = "file";
-    input.accept = ".zip,application/zip";
+    input.accept = ".zip,.rar,application/zip,application/vnd.rar";
     importLabel.appendChild(input);
     var reload = el("button", "", "Refresh list");
     reload.type = "button";
@@ -366,7 +428,7 @@
       var file = input.files && input.files[0];
       if (!file) return;
       setStatus("Installing " + file.name + "…");
-      installZip(file).then(function () {
+      installArchive(file).then(function () {
         setStatus("Mod installed. Enable it, then restart the game.");
         return refreshList();
       }).catch(function (error) {
