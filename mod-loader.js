@@ -1,0 +1,402 @@
+/* Hedge Web Mod Loader — browser-side mod manager for the Sonic Mania Web port.
+   Mod ZIP format:
+   - mod.json at ZIP root: {id,name,version,author,description,type,scripts?}
+   - assets/<game-relative-path> files are copied into the Emscripten FS before startup.
+   - scripts/*.js are optional browser-logic extensions loaded after the game starts.
+   Note: native RSDK/C++ DLL mods are not executable in this existing WebAssembly build.
+*/
+(function () {
+  "use strict";
+
+  var DB_NAME = "hedge-sonic-mania-mods";
+  var DB_VERSION = 1;
+  var STORE = "mods";
+  var MAX_ZIP_BYTES = 100 * 1024 * 1024;
+  var MAX_UNPACKED_BYTES = 256 * 1024 * 1024;
+  var dbPromise;
+  var logicListeners = Object.create(null);
+  var installedLogic = [];
+  var statusLine;
+
+  function openDB() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise(function (resolve, reject) {
+      var request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = function () {
+        var db = request.result;
+        if (!db.objectStoreNames.contains(STORE)) {
+          db.createObjectStore(STORE, { keyPath: "id" });
+        }
+      };
+      request.onsuccess = function () { resolve(request.result); };
+      request.onerror = function () { reject(request.error); };
+    });
+    return dbPromise;
+  }
+
+  function transaction(mode, work) {
+    return openDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(STORE, mode);
+        var store = tx.objectStore(STORE);
+        var result;
+        try { result = work(store); } catch (error) { reject(error); return; }
+        tx.oncomplete = function () { resolve(result && result.result); };
+        tx.onerror = function () { reject(tx.error); };
+        tx.onabort = function () { reject(tx.error || new Error("Storage transaction aborted")); };
+      });
+    });
+  }
+
+  function allMods() {
+    return openDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var request = db.transaction(STORE, "readonly").objectStore(STORE).getAll();
+        request.onsuccess = function () { resolve(request.result || []); };
+        request.onerror = function () { reject(request.error); };
+      });
+    });
+  }
+
+  function saveMod(mod) {
+    return transaction("readwrite", function (store) { return store.put(mod); });
+  }
+
+  function deleteMod(id) {
+    return transaction("readwrite", function (store) { return store.delete(id); });
+  }
+
+  function safeId(value) {
+    return /^[a-z0-9][a-z0-9._-]{0,47}$/i.test(value || "");
+  }
+
+  function safePath(path) {
+    if (!path || path.indexOf("\\") !== -1 || path.startsWith("/") || /^[a-z]:/i.test(path)) return false;
+    var parts = path.split("/");
+    return parts.every(function (part) { return part && part !== "." && part !== ".."; });
+  }
+
+  function parseManifest(zip) {
+    var entry = zip.file("mod.json");
+    if (!entry) throw new Error("This ZIP needs a mod.json file at its root.");
+    return entry.async("string").then(function (text) {
+      var manifest;
+      try { manifest = JSON.parse(text); } catch (_) { throw new Error("mod.json is not valid JSON."); }
+      if (!manifest || !safeId(manifest.id) || !manifest.name) {
+        throw new Error("mod.json needs a valid id and a name.");
+      }
+      manifest.type = manifest.type === "logic" ? "logic" : "asset";
+      manifest.version = String(manifest.version || "1.0");
+      manifest.author = String(manifest.author || "Unknown");
+      manifest.description = String(manifest.description || "");
+      if (manifest.scripts != null && !Array.isArray(manifest.scripts)) {
+        throw new Error("The scripts field must be an array of ZIP paths.");
+      }
+      return manifest;
+    });
+  }
+
+  function installZip(file) {
+    if (!window.JSZip) return Promise.reject(new Error("ZIP support did not load. Refresh and try again."));
+    if (!file || file.size > MAX_ZIP_BYTES) return Promise.reject(new Error("ZIP files must be 100 MB or smaller."));
+    return file.arrayBuffer().then(function (buffer) {
+      return JSZip.loadAsync(buffer, { checkCRC32: true }).then(function (zip) {
+        return parseManifest(zip).then(function (manifest) {
+          var files = Object.keys(zip.files).filter(function (name) {
+            return !zip.files[name].dir && name !== "mod.json";
+          });
+          var unpacked = files.reduce(function (total, name) {
+            return total + (zip.files[name]._data && zip.files[name]._data.uncompressedSize || 0);
+          }, 0);
+          if (unpacked > MAX_UNPACKED_BYTES) throw new Error("This mod expands beyond the 256 MB safety limit.");
+          var bad = files.find(function (name) { return !safePath(name); });
+          if (bad) throw new Error("Unsafe path in ZIP: " + bad);
+          var scripts = manifest.scripts || [];
+          scripts.forEach(function (path) {
+            if (!safePath(path) || !zip.file(path)) throw new Error("Missing or unsafe logic script: " + path);
+          });
+          var payloads = files.map(function (path) {
+            return zip.file(path).async("uint8array").then(function (bytes) {
+              return { path: path, bytes: bytes };
+            });
+          });
+          return Promise.all(payloads).then(function (entries) {
+            return saveMod({
+              id: manifest.id,
+              name: String(manifest.name),
+              version: manifest.version,
+              author: manifest.author,
+              description: manifest.description,
+              type: manifest.type,
+              scripts: scripts,
+              enabled: false,
+              installedAt: Date.now(),
+              files: entries
+            });
+          });
+        });
+      });
+    });
+  }
+
+  function makeAPI(modId) {
+    return Object.freeze({
+      modId: modId,
+      on: function (eventName, callback) {
+        if (typeof callback !== "function") throw new TypeError("Mod event callback must be a function.");
+        (logicListeners[eventName] || (logicListeners[eventName] = [])).push({ modId: modId, callback: callback });
+        return function () {
+          logicListeners[eventName] = (logicListeners[eventName] || []).filter(function (item) {
+            return item.callback !== callback || item.modId !== modId;
+          });
+        };
+      },
+      emit: function (eventName, detail) {
+        (logicListeners[eventName] || []).slice().forEach(function (item) {
+          try { item.callback(detail); } catch (error) { console.error("[Web Mod] " + item.modId, error); }
+        });
+      },
+      getCanvas: function () { return document.getElementById("canvas"); },
+      getGameModule: function () { return window.Module || null; },
+      readFile: function (path) {
+        if (!window.FS || !safePath(path)) throw new Error("Invalid game file path.");
+        return FS.readFile("/" + path);
+      },
+      writeFile: function (path, bytes) {
+        if (!window.FS || !safePath(path)) throw new Error("Invalid game file path.");
+        FS.writeFile("/" + path, bytes);
+      }
+    });
+  }
+
+  window.SonicManiaModAPI = Object.freeze({
+    version: "0.1.0",
+    on: function (eventName, callback) {
+      return makeAPI("anonymous").on(eventName, callback);
+    },
+    emit: function (eventName, detail) {
+      (logicListeners[eventName] || []).slice().forEach(function (item) {
+        try { item.callback(detail); } catch (error) { console.error("[Web Mod]", error); }
+      });
+    }
+  });
+
+  function loadEnabledModsIntoFS() {
+    return allMods().then(function (mods) {
+      var enabled = mods.filter(function (mod) { return mod.enabled; }).sort(function (a, b) {
+        return (a.priority || 0) - (b.priority || 0) || a.installedAt - b.installedAt;
+      });
+      var chain = Promise.resolve();
+      enabled.forEach(function (mod) {
+        chain = chain.then(function () {
+          mod.files.forEach(function (entry) {
+            if (entry.path.indexOf("assets/") !== 0) return;
+            var relative = entry.path.slice(7);
+            if (!safePath(relative)) return;
+            var fullPath = "/" + relative;
+            var parent = fullPath.slice(0, fullPath.lastIndexOf("/"));
+            if (parent && parent !== "/" && FS.mkdirTree) FS.mkdirTree(parent);
+            FS.writeFile(fullPath, entry.bytes);
+          });
+          installedLogic.push(mod);
+        });
+      });
+      return chain;
+    });
+  }
+
+  function runLogicMods() {
+    var chain = Promise.resolve();
+    installedLogic.forEach(function (mod) {
+      (mod.scripts || []).forEach(function (scriptPath) {
+        var entry = mod.files.find(function (item) { return item.path === scriptPath; });
+        if (!entry) return;
+        chain = chain.then(function () {
+          var source = new TextDecoder().decode(entry.bytes);
+          var wrapped = '"use strict";\n(function(api){\n' + source + '\n})(window.__createSonicManiaModAPI(' + JSON.stringify(mod.id) + '));';
+          var blobUrl = URL.createObjectURL(new Blob([wrapped], { type: "text/javascript" }));
+          var script = document.createElement("script");
+          script.src = blobUrl;
+          script.onload = function () { URL.revokeObjectURL(blobUrl); };
+          script.onerror = function () { URL.revokeObjectURL(blobUrl); console.error("Could not load logic script for " + mod.name); };
+          document.head.appendChild(script);
+        });
+      });
+    });
+    return chain.then(function () {
+      window.SonicManiaModAPI.emit("gameReady", { canvas: document.getElementById("canvas") });
+    });
+  }
+
+  window.__createSonicManiaModAPI = makeAPI;
+
+  function setStatus(message) {
+    if (statusLine) statusLine.textContent = message;
+  }
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function renderMods(list) {
+    var container = document.getElementById("sm-mod-list");
+    if (!container) return;
+    container.textContent = "";
+    if (!list.length) {
+      container.appendChild(el("p", "sm-empty", "No mods installed yet. Import a .zip to get started."));
+      return;
+    }
+    list.sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (mod) {
+      var card = el("article", "sm-mod-card");
+      var details = el("div", "sm-mod-details");
+      details.appendChild(el("strong", "", mod.name));
+      details.appendChild(el("small", "", "v" + mod.version + " · " + mod.author + " · " + (mod.type === "logic" ? "Web logic" : "Assets")));
+      if (mod.description) details.appendChild(el("p", "", mod.description));
+      var actions = el("div", "sm-mod-actions");
+      var toggle = el("button", "sm-small-button", mod.enabled ? "Enabled" : "Disabled");
+      toggle.setAttribute("aria-pressed", String(!!mod.enabled));
+      toggle.addEventListener("click", function () {
+        mod.enabled = !mod.enabled;
+        saveMod(mod).then(refreshList).catch(function (error) { setStatus(error.message); });
+        setStatus("Mod setting saved. Restart the game to apply changes.");
+      });
+      var remove = el("button", "sm-small-button sm-remove", "Remove");
+      remove.addEventListener("click", function () {
+        if (!confirm("Remove " + mod.name + "?")) return;
+        deleteMod(mod.id).then(refreshList).then(function () { setStatus("Mod removed."); });
+      });
+      actions.appendChild(toggle);
+      actions.appendChild(remove);
+      card.appendChild(details);
+      card.appendChild(actions);
+      container.appendChild(card);
+    });
+  }
+
+  function refreshList() {
+    return allMods().then(function (mods) { renderMods(mods); return mods; });
+  }
+
+  function buildUI() {
+    if (document.getElementById("sm-mod-manager")) return;
+    var style = el("style");
+    style.textContent = [
+      "#sm-mod-open{margin-top:8px}",
+      "#sm-mod-manager{position:fixed;inset:0;z-index:5000;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.78);font-family:Inter,Arial,sans-serif;color:#fff}",
+      "#sm-mod-manager.open{display:flex}",
+      ".sm-mod-window{width:min(720px,100%);max-height:88vh;overflow:auto;background:#101827;border:1px solid #42628c;border-radius:14px;box-shadow:0 20px 70px #000;padding:20px;text-align:left}",
+      ".sm-mod-head{display:flex;align-items:center;justify-content:space-between;gap:12px}",
+      ".sm-mod-head h2{font-size:22px;margin:0}",
+      ".sm-mod-sub{color:#a9bad0;font-size:13px;line-height:1.5;margin:10px 0 16px}",
+      ".sm-mod-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}",
+      ".sm-mod-toolbar button,.sm-mod-toolbar label,.sm-small-button{border:1px solid #58759b;background:#1d3554;color:white;border-radius:8px;padding:9px 12px;font-weight:700;cursor:pointer;font:inherit;font-size:13px}",
+      ".sm-mod-toolbar button:hover,.sm-mod-toolbar label:hover,.sm-small-button:hover{background:#294a72}",
+      ".sm-mod-toolbar input{display:none}",
+      "#sm-mod-list{display:grid;gap:9px}",
+      ".sm-mod-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;background:#172338;border:1px solid #2d4566;border-radius:10px}",
+      ".sm-mod-details{min-width:0;display:grid;gap:4px}.sm-mod-details small,.sm-mod-details p{color:#b4c3d6;font-size:12px;margin:0;overflow-wrap:anywhere}",
+      ".sm-mod-actions{display:flex;gap:6px;flex-shrink:0}.sm-small-button{padding:7px 9px}.sm-remove{border-color:#8d4d57;background:#49232d}",
+      ".sm-empty{padding:20px;color:#b4c3d6;text-align:center;background:#172338;border-radius:10px}",
+      "#sm-mod-status{font-size:12px;color:#9ec7ff;min-height:18px;margin-top:12px}",
+      ".sm-mod-warning{font-size:12px;line-height:1.5;color:#ffd58a;background:#3b2c13;border:1px solid #795a22;padding:10px;border-radius:8px;margin-top:12px}",
+      "@media(max-width:520px){.sm-mod-card{align-items:flex-start;flex-direction:column}.sm-mod-window{padding:14px}.sm-mod-head h2{font-size:18px}}"
+    ].join("\n");
+    document.head.appendChild(style);
+
+    var panel = document.querySelector(".control-panel");
+    var open = el("button", "game-btn", "Mods");
+    open.id = "sm-mod-open";
+    open.type = "button";
+    if (panel) panel.appendChild(open);
+
+    var overlay = el("div");
+    overlay.id = "sm-mod-manager";
+    var windowBox = el("section", "sm-mod-window");
+    windowBox.setAttribute("role", "dialog");
+    windowBox.setAttribute("aria-modal", "true");
+    windowBox.setAttribute("aria-labelledby", "sm-mod-title");
+    var header = el("div", "sm-mod-head");
+    var heading = el("h2", "", "Sonic Mania Web · Mod Manager");
+    heading.id = "sm-mod-title";
+    var close = el("button", "sm-small-button", "Close");
+    close.type = "button";
+    header.appendChild(heading);
+    header.appendChild(close);
+    windowBox.appendChild(header);
+    windowBox.appendChild(el("p", "sm-mod-sub", "Install ZIP mods, switch them on or off, and keep your collection saved in this browser. Changes apply after restarting the game."));
+    var toolbar = el("div", "sm-mod-toolbar");
+    var importLabel = el("label", "", "＋ Import .ZIP");
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".zip,application/zip";
+    importLabel.appendChild(input);
+    var reload = el("button", "", "Refresh list");
+    reload.type = "button";
+    toolbar.appendChild(importLabel);
+    toolbar.appendChild(reload);
+    windowBox.appendChild(toolbar);
+    var list = el("div");
+    list.id = "sm-mod-list";
+    windowBox.appendChild(list);
+    statusLine = el("p");
+    statusLine.id = "sm-mod-status";
+    windowBox.appendChild(statusLine);
+    windowBox.appendChild(el("p", "sm-mod-warning", "Compatibility note: asset files load through the game's Emscripten filesystem. JavaScript logic mods can use SonicManiaModAPI. Native RSDK/C++ DLL mods need a specially rebuilt WebAssembly engine and are not supported by this existing runtime yet."));
+    overlay.appendChild(windowBox);
+    document.body.appendChild(overlay);
+
+    function show() { overlay.classList.add("open"); refreshList().catch(function (e) { setStatus(e.message); }); }
+    function hide() { overlay.classList.remove("open"); }
+    open.addEventListener("click", show);
+    close.addEventListener("click", hide);
+    overlay.addEventListener("click", function (event) { if (event.target === overlay) hide(); });
+    reload.addEventListener("click", function () { refreshList().catch(function (e) { setStatus(e.message); }); });
+    input.addEventListener("change", function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      setStatus("Installing " + file.name + "…");
+      installZip(file).then(function () {
+        setStatus("Mod installed. Enable it, then restart the game.");
+        return refreshList();
+      }).catch(function (error) {
+        setStatus("Install failed: " + error.message);
+      }).finally(function () { input.value = ""; });
+    });
+    refreshList().catch(function (error) { setStatus("Storage unavailable: " + error.message); });
+  }
+
+  function registerEngineHooks() {
+    if (!window.Module) return;
+    Module.preRun = Module.preRun || [];
+    Module.preRun.push(function () {
+      if (typeof addRunDependency === "function") addRunDependency("sonic-web-mods");
+      loadEnabledModsIntoFS().catch(function (error) {
+        console.error("[Sonic Mania Web Mods] Could not apply mods:", error);
+      }).finally(function () {
+        if (typeof removeRunDependency === "function") removeRunDependency("sonic-web-mods");
+      });
+    });
+    Module.postRun = Module.postRun || [];
+    Module.postRun.push(function () {
+      runLogicMods().catch(function (error) { console.error("[Sonic Mania Web Mods] Logic mod error:", error); });
+    });
+  }
+
+  function bindGameEvents() {
+    window.addEventListener("keydown", function (event) {
+      window.SonicManiaModAPI.emit("keydown", { key: event.key, code: event.code, repeat: event.repeat });
+    });
+    window.addEventListener("keyup", function (event) {
+      window.SonicManiaModAPI.emit("keyup", { key: event.key, code: event.code });
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () { buildUI(); registerEngineHooks(); bindGameEvents(); });
+  } else {
+    buildUI(); registerEngineHooks(); bindGameEvents();
+  }
+})();
