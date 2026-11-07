@@ -11,7 +11,7 @@
   var DB_NAME = "hedge-sonic-mania-mods";
   var DB_VERSION = 1;
   var STORE = "mods";
-  var MAX_ZIP_BYTES = 200 * 1024 * 1024;
+  var MAX_ZIP_BYTES = 100 * 1024 * 1024;
   var MAX_UNPACKED_BYTES = 256 * 1024 * 1024;
   var dbPromise;
   var logicListeners = Object.create(null);
@@ -158,7 +158,7 @@
   }
 
   function installArchive(file) {
-    if (!file || file.size > MAX_ZIP_BYTES) return Promise.reject(new Error("Archive files must be 200 MB or smaller."));
+    if (!file || file.size > MAX_ZIP_BYTES) return Promise.reject(new Error("Archive files must be 100 MB or smaller."));
     var extension = (file.name.split(".").pop() || "").toLowerCase();
     var entriesPromise;
     if (extension === "zip") {
