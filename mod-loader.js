@@ -523,7 +523,7 @@
     statusLine = el("p");
     statusLine.id = "sm-mod-status";
     windowBox.appendChild(statusLine);
-    windowBox.appendChild(el("p", "sm-mod-warning", "WebAssembly C++ mods are experimental: they run in a restricted module runtime with mod_init, optional mod_update, optional mod_shutdown, and the hedge_log import. They do not yet have access to Sonic Mania internals or native GameAPI/DLL features. Only install WASM mods you trust; a module can still freeze the page."));
+    windowBox.appendChild(el("p", "sm-mod-warning", "WebAssembly C++ mods are experimental: they run in a restricted module runtime with mod_init, optional mod_update, optional mod_shutdown, and the hedge_log import. The supported host calls are hedge_log and hedge_set_mod_badge (a visible status badge); they still do not have access to Sonic Mania internals or native GameAPI/DLL features. Only install WASM mods you trust; a module can still freeze the page."));
     overlay.appendChild(windowBox);
     document.body.appendChild(overlay);
 
