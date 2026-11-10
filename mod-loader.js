@@ -319,15 +319,40 @@
         return WebAssembly.compile(entry.bytes).then(function (compiled) {
           var importDescriptions = WebAssembly.Module.imports(compiled);
           var unsupported = importDescriptions.filter(function (item) {
-            return item.module !== "env" || item.name !== "hedge_log" || item.kind !== "function";
+            return item.module !== "env" || (item.name !== "hedge_log" && item.name !== "hedge_set_mod_badge") || item.kind !== "function";
           });
           if (unsupported.length) throw new Error(mod.name + " imports unsupported host functions: " + unsupported.map(function (item) { return item.module + "." + item.name; }).join(", "));
           var available = Object.create(null);
           WebAssembly.Module.exports(compiled).forEach(function (item) { available[item.name] = item.kind; });
           if (available.mod_init !== "function") throw new Error(mod.name + " must export mod_init().");
-          var imports = { env: { hedge_log: function (code) {
-            console.log("[C++ Mod: " + mod.name + "] log code " + code);
-          } } };
+          var imports = { env: {
+            hedge_log: function (code) {
+              console.log("[C++ Mod: " + mod.name + "] log code " + code);
+            },
+            hedge_set_mod_badge: function (enabled) {
+              var badgeId = "sm-wasm-mod-badge";
+              var badge = document.getElementById(badgeId);
+              if (!enabled) {
+                if (badge && badge.getAttribute("data-mod-id") === mod.id) badge.remove();
+                return;
+              }
+              if (!badge) {
+                var style = document.getElementById("sm-wasm-mod-badge-style");
+                if (!style) {
+                  style = document.createElement("style");
+                  style.id = "sm-wasm-mod-badge-style";
+                  style.textContent = "#sm-wasm-mod-badge{position:fixed;z-index:1002;top:15px;left:15px;max-width:min(340px,calc(100vw - 30px));padding:10px 14px;border:1px solid rgba(255,255,255,.55);border-radius:9px;background:linear-gradient(110deg,#ff9d00,#e33124);color:#fff;font:900 12px/1.3 Inter,Arial,sans-serif;letter-spacing:.07em;text-align:left;text-shadow:0 1px 2px #702000;box-shadow:0 0 18px rgba(255,120,0,.55);pointer-events:none;animation:sm-wasm-badge-pulse 1.2s ease-in-out infinite alternate}@keyframes sm-wasm-badge-pulse{from{filter:brightness(.9);transform:scale(1)}to{filter:brightness(1.25);transform:scale(1.035)}}@media(max-width:600px){#sm-wasm-mod-badge{top:52px;left:12px;font-size:10px;padding:8px 10px}}";
+                  document.head.appendChild(style);
+                }
+                badge = document.createElement("div");
+                badge.id = badgeId;
+                badge.setAttribute("role", "status");
+                document.body.appendChild(badge);
+              }
+              badge.setAttribute("data-mod-id", mod.id);
+              badge.textContent = String(mod.name).toUpperCase() + "  •  LOADED";
+            }
+          } };
           return WebAssembly.instantiate(compiled, imports).then(function (result) {
             var instance = result instanceof WebAssembly.Instance ? result : result.instance;
             var item = { mod: mod, exports: instance.exports };
