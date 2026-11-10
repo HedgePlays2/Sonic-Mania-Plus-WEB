@@ -16,6 +16,9 @@
   var dbPromise;
   var logicListeners = Object.create(null);
   var installedLogic = [];
+  var runningWasmMods = [];
+  var wasmFrameHandle = 0;
+  var lastWasmFrameTime = 0;
   var statusLine;
 
   function openDB() {
@@ -147,10 +150,19 @@
         manifest.scripts.forEach(function (path) {
           if (!safePath(path) || !files.some(function (entry) { return entry.path === path; })) throw new Error("Missing or unsafe logic script: " + path);
         });
+        var modType = manifest.type === "logic" ? "logic" : (manifest.type === "wasm" ? "wasm" : "asset");
+        var wasmPath = manifest.wasm || "";
+        if (modType === "wasm") {
+          if (!safePath(wasmPath)) throw new Error('A WebAssembly mod needs a safe "wasm" archive path.');
+          var wasmEntry = files.find(function (entry) { return entry.path === wasmPath; });
+          if (!wasmEntry) throw new Error("WebAssembly module not found in archive: " + wasmPath);
+          if (wasmEntry.bytes.byteLength > 32 * 1024 * 1024) throw new Error("WebAssembly modules must be 32 MB or smaller.");
+          if (!window.WebAssembly) throw new Error("This browser does not support WebAssembly.");
+        }
         return {
           id: manifest.id, name: String(manifest.name), version: String(manifest.version || "1.0"),
           author: String(manifest.author || "Unknown"), description: String(manifest.description || ""),
-          type: manifest.type === "logic" ? "logic" : "asset", scripts: manifest.scripts,
+          type: modType, scripts: manifest.scripts, wasmPath: wasmPath,
           files: files
         };
       });
@@ -267,6 +279,76 @@
     });
   }
 
+  function startWasmUpdateLoop() {
+    if (wasmFrameHandle || !runningWasmMods.some(function (item) { return typeof item.exports.mod_update === "function"; })) return;
+    lastWasmFrameTime = 0;
+    function tick(timestamp) {
+      wasmFrameHandle = 0;
+      var delta = lastWasmFrameTime ? Math.min(100, Math.max(0, timestamp - lastWasmFrameTime)) : 0;
+      lastWasmFrameTime = timestamp;
+      runningWasmMods.slice().forEach(function (item) {
+        if (typeof item.exports.mod_update !== "function") return;
+        try { item.exports.mod_update(delta); }
+        catch (error) { console.error("[WASM Mod] Update failed for " + item.mod.name, error); }
+      });
+      if (runningWasmMods.some(function (item) { return typeof item.exports.mod_update === "function"; })) {
+        wasmFrameHandle = window.requestAnimationFrame(tick);
+      }
+    }
+    wasmFrameHandle = window.requestAnimationFrame(tick);
+  }
+
+  function stopWasmMods() {
+    if (wasmFrameHandle) window.cancelAnimationFrame(wasmFrameHandle);
+    wasmFrameHandle = 0;
+    runningWasmMods.slice().reverse().forEach(function (item) {
+      if (typeof item.exports.mod_shutdown === "function") {
+        try { item.exports.mod_shutdown(); }
+        catch (error) { console.error("[WASM Mod] Shutdown failed for " + item.mod.name, error); }
+      }
+    });
+    runningWasmMods = [];
+  }
+
+  function runWasmMods() {
+    var mods = installedLogic.filter(function (mod) { return mod.enabled && mod.type === "wasm"; });
+    return mods.reduce(function (chain, mod) {
+      return chain.then(function () {
+        var entry = mod.files.find(function (item) { return item.path === mod.wasmPath; });
+        if (!entry) throw new Error("Missing WebAssembly file for " + mod.name);
+        return WebAssembly.compile(entry.bytes).then(function (compiled) {
+          var importDescriptions = WebAssembly.Module.imports(compiled);
+          var unsupported = importDescriptions.filter(function (item) {
+            return item.module !== "env" || item.name !== "hedge_log" || item.kind !== "function";
+          });
+          if (unsupported.length) throw new Error(mod.name + " imports unsupported host functions: " + unsupported.map(function (item) { return item.module + "." + item.name; }).join(", "));
+          var available = Object.create(null);
+          WebAssembly.Module.exports(compiled).forEach(function (item) { available[item.name] = item.kind; });
+          if (available.mod_init !== "function") throw new Error(mod.name + " must export mod_init().");
+          var imports = { env: { hedge_log: function (code) {
+            console.log("[C++ Mod: " + mod.name + "] log code " + code);
+          } } };
+          return WebAssembly.instantiate(compiled, imports).then(function (result) {
+            var instance = result instanceof WebAssembly.Instance ? result : result.instance;
+            var item = { mod: mod, exports: instance.exports };
+            try {
+              instance.exports.mod_init();
+              runningWasmMods.push(item);
+              console.info("[C++ Mod] Started " + mod.name);
+            } catch (error) {
+              if (typeof instance.exports.mod_shutdown === "function") {
+                try { instance.exports.mod_shutdown(); } catch (_) {}
+              }
+              throw error;
+            }
+          });
+        });
+      }).catch(function (error) {
+        console.error("[C++ Mod] Could not start " + mod.name + ":", error);
+      });
+    }, Promise.resolve()).then(startWasmUpdateLoop);
+  }
+
   function runLogicMods() {
     var chain = Promise.resolve();
     installedLogic.forEach(function (mod) {
@@ -294,6 +376,8 @@
       });
     });
     return chain.then(function () {
+      return runWasmMods();
+    }).then(function () {
       window.SonicManiaModAPI.emit("gameReady", { canvas: document.getElementById("canvas") });
     });
   }
@@ -323,7 +407,7 @@
       var card = el("article", "sm-mod-card");
       var details = el("div", "sm-mod-details");
       details.appendChild(el("strong", "", mod.name));
-      details.appendChild(el("small", "", "v" + mod.version + " · " + mod.author + " · " + (mod.type === "logic" ? "Web logic" : "Assets")));
+      details.appendChild(el("small", "", "v" + mod.version + " · " + mod.author + " · " + (mod.type === "logic" ? "Web logic" : (mod.type === "wasm" ? "C++ / WebAssembly" : "Assets"))));
       if (mod.description) details.appendChild(el("p", "", mod.description));
       var actions = el("div", "sm-mod-actions");
       var toggle = el("button", "sm-small-button", mod.enabled ? "Enabled" : "Disabled");
@@ -414,7 +498,7 @@
     statusLine = el("p");
     statusLine.id = "sm-mod-status";
     windowBox.appendChild(statusLine);
-    windowBox.appendChild(el("p", "sm-mod-warning", "Compatibility note: asset files load through the game's Emscripten filesystem. JavaScript logic mods can use SonicManiaModAPI. Native RSDK/C++ DLL mods need a specially rebuilt WebAssembly engine and are not supported by this existing runtime yet."));
+    windowBox.appendChild(el("p", "sm-mod-warning", "WebAssembly C++ mods are experimental: they run in a restricted module runtime with mod_init, optional mod_update, optional mod_shutdown, and the hedge_log import. They do not yet have access to Sonic Mania internals or native GameAPI/DLL features. Only install WASM mods you trust; a module can still freeze the page."));
     overlay.appendChild(windowBox);
     document.body.appendChild(overlay);
 
@@ -482,6 +566,7 @@
     window.addEventListener("keyup", function (event) {
       window.SonicManiaModAPI.emit("keyup", { key: event.key, code: event.code });
     });
+    window.addEventListener("pagehide", stopWasmMods);
   }
 
   // Register the Emscripten hooks immediately: the async RSDK script may
