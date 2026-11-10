@@ -101,6 +101,7 @@ The current experimental ABI is deliberately small:
 - Optional export: `mod_update(delta_ms)`, called from the browser animation frame loop (not the game's actual simulation tick)
 - Optional export: `mod_shutdown()`, called when the page is being hidden/unloaded
 - Available import: `env.hedge_log(int code)`, which writes a diagnostic message to the browser console
+- Available import: `env.hedge_set_mod_badge(int enabled)`, which asks the browser host to show or hide a pulsing status badge for the calling mod
 
 The runtime rejects modules that import other host functions. This keeps the first proof-of-concept narrow; it is not a security boundary against untrusted modules. A badly behaved module can still freeze the page, so only install modules you trust. A WebAssembly module can compile and run successfully without being able to change anything inside Sonic Mania.
 
@@ -112,3 +113,10 @@ For the first test, build a tiny freestanding WebAssembly module that exports th
 - No C++ module can currently call Sonic Mania functions or replace checkpoint sprites through this ABI.
 - `mod_update` is driven by `requestAnimationFrame`, not an engine tick, and should only be used for harmless runtime tests for now.
 - The checkpoint asset override path remains separately unverified.
+
+
+### Visible C++ mod example: Super Speed Indicator
+
+The repository's first visible C++ WebAssembly example is **Super Speed Mod**. It calls `hedge_set_mod_badge(1)` during `mod_init()`, which displays a pulsing `SUPER SPEED MOD • LOADED` badge. It hides the badge during `mod_shutdown()`.
+
+The example source is in `examples/super-speed-indicator/super_speed_indicator.cpp`. A ready-to-import ZIP is also provided separately. This is a visual proof that a C++ module can call a deliberately exposed browser-host function; it does **not** change Sonic's actual movement speed yet.
