@@ -1,0 +1,9 @@
+{
+  "id": "super-speed-indicator",
+  "name": "Super Speed Mod",
+  "version": "0.1.0",
+  "author": "Hedge",
+  "description": "A C++ WebAssembly mod that displays a pulsing SUPER SPEED MOD badge when loaded.",
+  "type": "wasm",
+  "wasm": "super-speed-indicator.wasm"
+}
