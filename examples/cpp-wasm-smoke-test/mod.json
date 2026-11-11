@@ -3,7 +3,7 @@
   "name": "C++ WebAssembly Smoke Test",
   "version": "0.1.0",
   "author": "Hedge",
-  "description": "Confirms that the experimental C++ WebAssembly module runtime can start.",
+  "description": "Confirms that the experimental C++ WebAssembly module runtime can start and run all lifecycle callbacks.",
   "type": "wasm",
   "wasm": "cpp-wasm-smoke-test.wasm"
 }

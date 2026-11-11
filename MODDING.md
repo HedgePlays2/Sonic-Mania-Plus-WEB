@@ -105,18 +105,53 @@ The current experimental ABI is deliberately small:
 
 The runtime rejects modules that import other host functions. This keeps the first proof-of-concept narrow; it is not a security boundary against untrusted modules. A badly behaved module can still freeze the page, so only install modules you trust. A WebAssembly module can compile and run successfully without being able to change anything inside Sonic Mania.
 
-For the first test, build a tiny freestanding WebAssembly module that exports the three lifecycle functions and imports only `env.hedge_log`. The C++ source should use `extern "C"` so the export names are not C++-mangled. The exact Emscripten linker flags still need to be validated against a real build before we publish a copy-paste compiler command.
+Build the repository examples from the root with Clang and LLD:
+
+```sh
+bash examples/build-wasm-examples.sh
+node examples/test-wasm-lifecycle.mjs
+```
+
+The build is freestanding and does not need Emscripten JavaScript glue. The tested compiler shape is:
+
+```sh
+clang++ --target=wasm32-unknown-unknown -std=c++17 -O2 -nostdlib \
+  -fno-exceptions -fno-rtti -Wl,--no-entry \
+  -Wl,--export=mod_init -Wl,--export=mod_update \
+  -Wl,--export=mod_shutdown -Wl,--strip-all \
+  -o my-mod.wasm my_mod.cpp
+```
+
+The Node test checks the module imports, all three lifecycle exports, and the expected host-call order. It verifies the module ABI independently of the full browser/game startup.
 
 ### Current limitations
 
 - The module loader is a proof-of-concept runtime only; it does not make existing native GameAPI mods compatible.
-- No C++ module can currently call Sonic Mania functions or replace checkpoint sprites through this ABI.
-- `mod_update` is driven by `requestAnimationFrame`, not an engine tick, and should only be used for harmless runtime tests for now.
-- The checkpoint asset override path remains separately unverified.
+- `mod_update` is driven by browser `requestAnimationFrame`, not an engine tick.
+- The browser badge host call is implemented, but still needs a live GitHub Pages/game-browser test.
+- Data-only asset overrides are staged into the virtual filesystem, but individual in-game replacements still need testing.
+
+### C++ WebAssembly examples
+
+- `examples/cpp-wasm-smoke-test/` is the minimal lifecycle test. It logs code `1` from `mod_init`, `3` on its first `mod_update`, and `2` from `mod_shutdown`.
+- `examples/super-speed-indicator/` displays a pulsing `SUPER SPEED MOD • LOADED` badge. It logs `1001` on init, `1003` on its first update, and `1002` on shutdown. The ready-to-import archive is `examples/super-speed-indicator/Super-Speed-Mod.zip`.
+
+The Super Speed example is a visible proof that a C++ module can call a deliberately exposed browser-host function. It does **not** change Sonic's actual movement speed.
 
 
-### Visible C++ mod example: Super Speed Indicator
+## Current engine boundary and future HedgeModAPI
 
-The repository's first visible C++ WebAssembly example is **Super Speed Mod**. It calls `hedge_set_mod_badge(1)` during `mod_init()`, which displays a pulsing `SUPER SPEED MOD • LOADED` badge. It hides the badge during `mod_shutdown()`.
+The page keeps the existing prebuilt `RSDKv5U.js` / `RSDKv5U.wasm` engine. Its current generated JavaScript glue exposes Emscripten runtime facilities such as `Module.FS`, `Module.cwrap`, and run-dependency helpers, but it does not publish Sonic Mania player objects or GameAPI callbacks to the page. `cwrap` can call only symbols exported by the engine build; it cannot make hidden engine functions appear.
 
-The example source is in `examples/super-speed-indicator/super_speed_indicator.cpp`. A ready-to-import ZIP is also provided separately. This is a visual proof that a C++ module can call a deliberately exposed browser-host function; it does **not** change Sonic's actual movement speed yet.
+Each C++ mod is instantiated separately with only the two `env` imports listed above. It does not import the engine's WebAssembly memory or function table. It therefore cannot safely read or write `EntityPlayer`, call RSDK object functions, or change player physics today.
+
+Safe hooks available now are limited to browser-level `keydown` / `keyup` events, the web mod manager's `gameReady` event, file staging through the existing Emscripten `Module.preRun` path, browser UI/logging calls, and the animation-frame callback for harmless mod-side work.
+
+A real gameplay-facing **HedgeModAPI** needs an engine-side bridge. The next route is to rebuild or port the engine/game source for WebAssembly and add a small, versioned C ABI inside that build. Start with read-only player snapshots and engine-originated events, then consider narrowly validated setters. Use stable entity handles and fixed-width values rather than raw pointers or hard-coded memory offsets. Candidate engine events include `Update`, `LateUpdate`, `StaticUpdate`, `Draw`, `Create`, and `StageLoad`.
+
+This is distinct from the native RSDK decompilation's GameAPI/ModAPI system. Its documented logic-file mods and engine events are not automatically available to this separate browser module:
+
+- [RSDKv5 GameAPI](https://rsdkmodding.com/RSDKv5/GameAPI/)
+- [RSDKv5 mod loader and LogicFile format](https://rsdkmodding.com/RSDKv5/Decompilation/ModLoader/)
+- [RSDKv5 build guide](https://rsdkmodding.com/Guides/RSDKv5/Decompilation/Building/)
+- [Emscripten Module object and lifecycle hooks](https://emscripten.org/docs/api_reference/module.html)

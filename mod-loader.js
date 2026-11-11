@@ -325,6 +325,8 @@
           var available = Object.create(null);
           WebAssembly.Module.exports(compiled).forEach(function (item) { available[item.name] = item.kind; });
           if (available.mod_init !== "function") throw new Error(mod.name + " must export mod_init().");
+          if (available.mod_update !== undefined && available.mod_update !== "function") throw new Error(mod.name + " exports mod_update, but it is not a function.");
+          if (available.mod_shutdown !== undefined && available.mod_shutdown !== "function") throw new Error(mod.name + " exports mod_shutdown, but it is not a function.");
           var imports = { env: {
             hedge_log: function (code) {
               console.log("[C++ Mod: " + mod.name + "] log code " + code);
@@ -440,7 +442,7 @@
       toggle.addEventListener("click", function () {
         mod.enabled = !mod.enabled;
         saveMod(mod).then(refreshList).catch(function (error) { setStatus(error.message); });
-        setStatus("Mod setting saved. Restart the game to apply changes.");
+        setStatus("Mod setting saved. Reload the page to apply changes.");
       });
       var remove = el("button", "sm-small-button sm-remove", "Remove");
       remove.addEventListener("click", function () {
@@ -505,7 +507,7 @@
     header.appendChild(heading);
     header.appendChild(close);
     windowBox.appendChild(header);
-    windowBox.appendChild(el("p", "sm-mod-sub", "Install Sonic Mania mod archives (.zip or .rar), switch them on or off, and keep your collection saved in this browser. Changes apply after restarting the game."));
+    windowBox.appendChild(el("p", "sm-mod-sub", "Install Sonic Mania mod archives (.zip or .rar), switch them on or off, and keep your collection saved in this browser. Changes apply after reloading the page."));
     var toolbar = el("div", "sm-mod-toolbar");
     var importLabel = el("label", "", "＋ Import .ZIP / .RAR");
     var input = document.createElement("input");
@@ -523,7 +525,7 @@
     statusLine = el("p");
     statusLine.id = "sm-mod-status";
     windowBox.appendChild(statusLine);
-    windowBox.appendChild(el("p", "sm-mod-warning", "WebAssembly C++ mods are experimental: they run in a restricted module runtime with mod_init, optional mod_update, optional mod_shutdown, and the hedge_log import. The supported host calls are hedge_log and hedge_set_mod_badge (a visible status badge); they still do not have access to Sonic Mania internals or native GameAPI/DLL features. Only install WASM mods you trust; a module can still freeze the page."));
+    windowBox.appendChild(el("p", "sm-mod-warning", "WebAssembly C++ mods are experimental: they run in a restricted module runtime with mod_init, optional mod_update, and optional mod_shutdown. mod_update is driven by the browser animation-frame loop, not Sonic Mania’s game tick. Supported host calls are hedge_log and hedge_set_mod_badge (a visible status badge); these modules still do not have access to Sonic Mania internals or native GameAPI/DLL features. Only install WASM mods you trust; a module can still freeze the page."));
     overlay.appendChild(windowBox);
     document.body.appendChild(overlay);
 
@@ -538,7 +540,7 @@
       if (!file) return;
       setStatus("Installing " + file.name + "…");
       installArchive(file).then(function () {
-        setStatus("Mod installed. Enable it, then restart the game.");
+        setStatus("Mod installed. Enable it, then reload the page.");
         return refreshList();
       }).catch(function (error) {
         setStatus("Install failed: " + error.message);

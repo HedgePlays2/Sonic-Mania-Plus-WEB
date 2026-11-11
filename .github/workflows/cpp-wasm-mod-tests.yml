@@ -1,0 +1,30 @@
+name: C++ WebAssembly mod tests
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Clang and LLD
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld
+      - name: Build WebAssembly examples and test lifecycle
+        run: bash examples/build-wasm-examples.sh
+      - name: Verify browser loader lifecycle wiring
+        run: node examples/test-loader-wiring.mjs
