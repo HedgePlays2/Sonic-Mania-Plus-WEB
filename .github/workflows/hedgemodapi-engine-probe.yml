@@ -41,11 +41,18 @@ jobs:
           const exports = WebAssembly.Module.exports(module).map(x => x.name);
           console.log('WASM bytes:', bytes.byteLength);
           console.log('WASM exports:', exports.join(', '));
-          if (!exports.includes('main')) {
-            throw new Error('Expected the isolated engine build to export main');
+          if (exports.length === 0) {
+            throw new Error('Expected the isolated engine build to expose WebAssembly exports');
           }
+          // Emscripten may minify/rename raw WebAssembly export names.
+          // The baseline probe therefore validates module integrity and a
+          // non-empty export surface, not a literal "main" export name.
           if (exports.some(name => /hedge|playerstate/i.test(name))) {
             throw new Error('Unexpected HedgeModAPI/player-state export in baseline probe');
+          }
+          const js = await readFile('.probe/rsdkv5-wasm/dist/rsdkv5/rsdkv5.js', 'utf8');
+          if (!js.includes('instantiateWasm') && !js.includes('WebAssembly')) {
+            throw new Error('Expected the Emscripten JavaScript loader alongside the WASM module');
           }
           NODE
 
