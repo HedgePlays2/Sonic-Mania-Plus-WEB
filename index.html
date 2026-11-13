@@ -1163,6 +1163,23 @@
      * Escape -> Dev Menu
      */
 
+    function getLegacyKeyCode(keyCode) {
+        var codes = {
+            Escape: 27,
+            ArrowLeft: 37,
+            ArrowUp: 38,
+            ArrowRight: 39,
+            ArrowDown: 40,
+            KeyQ: 81,
+            KeyS: 83,
+            KeyA: 65,
+            KeyW: 87
+        };
+
+        return codes[keyCode] || 0;
+    }
+
+
     function sendKeyDown(keyCode) {
 
         var event = new KeyboardEvent(
@@ -1181,6 +1198,8 @@
                     keyCode,
 
                 code: keyCode,
+                keyCode: getLegacyKeyCode(keyCode),
+                which: getLegacyKeyCode(keyCode),
 
                 bubbles: true,
                 cancelable: true
@@ -1212,6 +1231,8 @@
                     keyCode,
 
                 code: keyCode,
+                keyCode: getLegacyKeyCode(keyCode),
+                which: getLegacyKeyCode(keyCode),
 
                 bubbles: true,
                 cancelable: true
